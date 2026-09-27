@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="UTF-8"><title>Convertidor Base64</title></head>
+<body>
+    <input type="file" id="inputFile" onchange="convertir()">
+    <textarea id="output" style="width:100%; height:300px; margin-top:20px;"></textarea>
+    <script>
+        function convertir() {
+            const file = document.getElementById('inputFile').files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('output').value = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+    </script>
+</body>
+</html>

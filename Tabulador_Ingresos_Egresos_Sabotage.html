@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabulador de Ingresos y Egresos 100% Offline</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #212121; color: #FCEED2; font-size: 1.1rem; }
+        
+        @media print {
+            .no-print { display: none !important; }
+            .hidden { display: none !important; }
+            body { background: white !important; color: #1e293b !important; height: auto !important; overflow: visible !important; font-size: 12pt !important; }
+            
+            body > *:not(#report-modal):not(#period-summary-modal) { display: none !important; }
+            
+            #report-modal:not(.hidden), #period-summary-modal:not(.hidden) { 
+                position: absolute !important; 
+                top: 0 !important; left: 0 !important; 
+                width: 100% !important; 
+                height: auto !important;
+                background: transparent !important;
+                display: block !important;
+                padding: 0 !important;
+                overflow: visible !important;
+            }
+            
+            #report-modal > div, #period-summary-modal > div {
+                border: none !important;
+                box-shadow: none !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                height: auto !important;
+                background: white !important;
+                color: #1e293b !important;
+                overflow: visible !important;
+                position: static !important;
+            }
+
+            #report-content, #period-summary-content { 
+                background: white !important; 
+                color: #1e293b !important; 
+                border: none !important; 
+                overflow: visible !important;
+                height: auto !important;
+                max-height: none !important;
+                padding: 0 !important;
+            }
+
+            .print-card { 
+                background-color: #ffffff !important; 
+                border: 1px solid #cbd5e1 !important; 
+                color: #1e293b !important; 
+                break-inside: avoid;
+                page-break-inside: avoid;
+            }
+
+            .print-section-block {
+                break-inside: avoid;
+                page-break-inside: avoid;
+                margin-bottom: 1.5rem;
+                background-color: #ffffff !important;
+                border: 1px solid #cbd5e1 !important;
+                border-radius: 0.75rem;
+                padding: 1.25rem;
+            }
+
+            .print-text { color: #1e293b !important; }
+            .print-text-muted { color: #64748b !important; }
+            .print-border { border-color: #cbd5e1 !important; }
+            .print-bg-alt { background-color: #ffffff !important; }
+            
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color: #1e293b !important; }
+            .print-text-lime { color: #166534 !important; }
+            .print-text-red { color: #991b1b !important; }
+            .print-text-muted-override { color: #64748b !important; }
+        }
+    </style>
+</head>
+<body class="bg-[#212121] text-[#FCEED2] min-h-full flex flex-col w-full">
+
+    <header class="bg-[#212121] text-[#FCEED2] shadow-lg border-b border-[#BDBDBD]/20 no-print w-full">
+        <div class="w-full max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-[#5B3CC4]/20 p-2.5 rounded-xl border border-[#5B3CC4]/40 shadow-sm">
+                    <svg class="w-7 h-7 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.333 2 3 2 3 .895 3 2-1.333 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+                <div>
+                    <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-[#FCEED2]">Tabulador de Ingresos y Egresos</h1>
+                    <p class="text-sm text-[#BDBDBD]">Control financiero con rendimiento diario del 6.5% anual y corte (días 15 y fin de mes)</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-3 flex-wrap justify-end">
+                <div id="live-clock" class="bg-[#212121] border border-[#BDBDBD]/30 px-3.5 py-2 rounded-xl text-sm font-medium text-[#FCEED2] flex items-center gap-2 shadow-inner">
+                    <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span id="clock-text">--/--/---- --:--:--</span>
+                </div>
+
+                <button onclick="app.exportDataFile()" class="px-3.5 py-2.5 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-sm font-semibold rounded-xl transition text-[#FCEED2] border border-[#5B3CC4]/50 flex items-center gap-2 shadow-sm" title="Guardar archivo de datos">
+                    <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                    Guardar Datos
+                </button>
+                <label class="px-3.5 py-2.5 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-sm font-semibold rounded-xl transition text-[#FCEED2] border border-[#5B3CC4]/50 flex items-center gap-2 cursor-pointer shadow-sm" title="Cargar archivo de datos">
+                    <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                    Cargar Datos
+                    <input type="file" id="import-file-input" accept=".json" onchange="app.importDataFile(event)" class="hidden">
+                </label>
+                <button onclick="app.confirmResetData()" class="px-3.5 py-2.5 bg-[#D83635] hover:bg-[#D83635]/80 text-sm font-semibold rounded-xl transition text-[#FCEED2] border border-[#D83635]/50 flex items-center gap-2 shadow-sm">
+                    <svg class="w-4 h-4 text-[#FCEED2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    Restaurar
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
+        
+        <!-- SECCIÓN 1: GESTIÓN DE INTEGRANTES -->
+        <section class="bg-[#212121] rounded-2xl shadow-md border border-[#BDBDBD]/20 p-5 no-print w-full">
+            <div class="flex justify-between items-center mb-3">
+                <h2 class="text-base sm:text-lg font-bold text-[#FCEED2] flex items-center gap-2">
+                    <svg class="w-5 h-5 text-[#5B3CC4]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    Integrantes para Repartición (60% del Corte)
+                </h2>
+                <button onclick="app.openMemberModal()" class="bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] px-4 py-2 rounded-xl text-sm font-semibold border border-[#5B3CC4]/50 transition flex items-center gap-1.5 shadow-sm">
+                    <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    Añadir Nombre
+                </button>
+            </div>
+            <div id="members-container" class="flex flex-wrap gap-2.5">
+                <p class="text-sm text-[#BDBDBD] italic">No hay integrantes añadidos aún.</p>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 2: CAJAS FINANCIERAS -->
+        <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 no-print w-full">
+            <!-- 1. Ingresos Acumulados -->
+            <div class="bg-[#212121] rounded-2xl p-6 border border-[#BDBDBD]/20 flex flex-col justify-between shadow-sm">
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#BDBDBD]">Ingresos Acumulados</span>
+                        <span class="text-xs bg-[#5B3CC4]/20 text-[#C4FF3A] px-2.5 py-0.5 rounded-full border border-[#5B3CC4]/40 font-medium">6.5% Anual</span>
+                    </div>
+                    <div id="caja-ingresos-total" class="text-3xl sm:text-4xl font-extrabold text-[#FCEED2] mb-2">$0.00</div>
+                    <div class="flex flex-col gap-1 mb-4">
+                        <div id="caja-ingresos-interest" class="text-sm font-medium text-[#C4FF3A] flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                            <span>Generado 6.5%: +$0.00</span>
+                        </div>
+                        <div id="caja-ingresos-countdown" class="text-xs text-[#BDBDBD] font-mono">Actualización en: --:--:--</div>
+                    </div>
+                </div>
+                <button onclick="app.openDepositModal()" class="w-full bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] py-3 px-4 rounded-xl text-sm font-semibold border border-[#5B3CC4]/50 transition flex items-center justify-center gap-2 shadow-sm">
+                    <svg class="w-5 h-5 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                    Añadir Dinero
+                </button>
+            </div>
+
+            <!-- 2. Gastos Operativos -->
+            <div class="bg-[#212121] rounded-2xl p-6 border border-[#BDBDBD]/20 flex flex-col justify-between shadow-sm">
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#BDBDBD]">Gastos Operativos</span>
+                        <span class="text-xs bg-[#5B3CC4]/20 text-[#C4FF3A] px-2.5 py-0.5 rounded-full border border-[#5B3CC4]/40 font-medium">6.5% + 20%</span>
+                    </div>
+                    <div id="caja-operativos-total" class="text-3xl sm:text-4xl font-extrabold text-[#FCEED2] mb-2">$0.00</div>
+                    <div class="flex flex-col gap-1 mb-4">
+                        <div id="caja-operativos-interest" class="text-sm font-medium text-[#C4FF3A] flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                            <span>Generado 6.5%: +$0.00</span>
+                        </div>
+                        <div id="caja-operativos-countdown" class="text-xs text-[#BDBDBD] font-mono">Actualización en: --:--:--</div>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <button onclick="app.openManualDepositModal('operativos')" class="w-full bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] py-2.5 px-4 rounded-xl text-sm font-semibold border border-[#5B3CC4]/50 transition flex items-center justify-center gap-2 shadow-sm">
+                        <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        Añadir Dinero (Ajuste)
+                    </button>
+                    <button onclick="app.openWithdrawModal('operativos')" class="w-full bg-[#D83635] hover:bg-[#D83635]/80 text-[#FCEED2] py-2.5 px-4 rounded-xl text-sm font-semibold border border-[#D83635]/50 transition flex items-center justify-center gap-2 shadow-sm">
+                        <svg class="w-4 h-4 text-[#FCEED2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                        Retirar Fondos
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. Reinversión -->
+            <div class="bg-[#212121] rounded-2xl p-6 border border-[#BDBDBD]/20 flex flex-col justify-between shadow-sm">
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#BDBDBD]">Reinversión</span>
+                        <span class="text-xs bg-[#5B3CC4]/20 text-[#C4FF3A] px-2.5 py-0.5 rounded-full border border-[#5B3CC4]/40 font-medium">6.5% + 20%</span>
+                    </div>
+                    <div id="caja-reinversion-total" class="text-3xl sm:text-4xl font-extrabold text-[#FCEED2] mb-2">$0.00</div>
+                    <div class="flex flex-col gap-1 mb-4">
+                        <div id="caja-reinversion-interest" class="text-sm font-medium text-[#C4FF3A] flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                            <span>Generado 6.5%: +$0.00</span>
+                        </div>
+                        <div id="caja-reinversion-countdown" class="text-xs text-[#BDBDBD] font-mono">Actualización en: --:--:--</div>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <button onclick="app.openManualDepositModal('reinversion')" class="w-full bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] py-2.5 px-4 rounded-xl text-sm font-semibold border border-[#5B3CC4]/50 transition flex items-center justify-center gap-2 shadow-sm">
+                        <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        Añadir Dinero (Ajuste)
+                    </button>
+                    <button onclick="app.openWithdrawModal('reinversion')" class="w-full bg-[#D83635] hover:bg-[#D83635]/80 text-[#FCEED2] py-2.5 px-4 rounded-xl text-sm font-semibold border border-[#D83635]/50 transition flex items-center justify-center gap-2 shadow-sm">
+                        <svg class="w-4 h-4 text-[#FCEED2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                        Retirar Fondos
+                    </button>
+                </div>
+            </div>
+
+            <!-- 4. CAJA IVA (Independiente del corte) -->
+            <div class="bg-[#212121] rounded-2xl p-6 border border-[#BDBDBD]/20 flex flex-col justify-between shadow-sm">
+                <div>
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xs sm:text-sm font-semibold uppercase tracking-wider text-[#BDBDBD]">IVA</span>
+                        <span class="text-xs bg-[#5B3CC4]/20 text-[#C4FF3A] px-2.5 py-0.5 rounded-full border border-[#5B3CC4]/40 font-medium">6.5% Anual</span>
+                    </div>
+                    <div id="caja-iva-total" class="text-3xl sm:text-4xl font-extrabold text-[#FCEED2] mb-2">$0.00</div>
+                    <div class="flex flex-col gap-1 mb-4">
+                        <div id="caja-iva-interest" class="text-sm font-medium text-[#C4FF3A] flex items-center gap-1.5">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+                            <span>Generado 6.5%: +$0.00</span>
+                        </div>
+                        <div id="caja-iva-countdown" class="text-xs text-[#BDBDBD] font-mono">Actualización en: --:--:--</div>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2">
+                    <button onclick="app.openManualDepositModal('iva')" class="w-full bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] py-2.5 px-4 rounded-xl text-sm font-semibold border border-[#5B3CC4]/50 transition flex items-center justify-center gap-2 shadow-sm">
+                        <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path></svg>
+                        Añadir Dinero (Ajuste)
+                    </button>
+                    <button onclick="app.openWithdrawModal('iva')" class="w-full bg-[#D83635] hover:bg-[#D83635]/80 text-[#FCEED2] py-2.5 px-4 rounded-xl text-sm font-semibold border border-[#D83635]/50 transition flex items-center justify-center gap-2 shadow-sm">
+                        <svg class="w-4 h-4 text-[#FCEED2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg>
+                        Retirar Fondos
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- SECCIÓN 3: CORTE (DÍA 15 Y ÚLTIMO DÍA DEL MES) -->
+        <section class="bg-[#212121] rounded-2xl shadow-md border border-[#BDBDBD]/20 p-6 no-print text-center w-full">
+            <h3 class="text-base sm:text-lg font-bold text-[#FCEED2] mb-2">Cierre y Procesamiento del Corte (Días 15 y Fin de Mes)</h3>
+            <p class="text-sm text-[#BDBDBD] mb-5">Previsualiza la distribución de ingresos, retiros e historial antes de aplicar el corte de periodo.</p>
+            <button onclick="app.previewCorteMensual()" class="bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] font-semibold py-3.5 px-8 rounded-xl shadow border border-[#5B3CC4]/50 transition inline-flex items-center gap-2.5 text-base shadow-sm">
+                <svg class="w-5 h-5 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                Generar Previsualización de Corte
+            </button>
+        </section>
+
+        <!-- SECCIÓN 4: DESGLOSE HISTÓRICO GLOBAL EN PANTALLA PRINCIPAL -->
+        <section class="bg-[#212121] rounded-2xl shadow-md border border-[#BDBDBD]/20 p-6 no-print space-y-4 w-full">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-[#BDBDBD]/20 pb-4">
+                <div>
+                    <h3 class="text-base sm:text-lg font-bold text-[#FCEED2] uppercase tracking-wider flex items-center gap-2">
+                        <svg class="w-5 h-5 text-[#5B3CC4]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012-2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        Historial General de Movimientos (Ingresos, Egresos y Cortes)
+                    </h3>
+                    <p class="text-sm text-[#BDBDBD] mt-0.5">Registro histórico organizado por periodos mensuales.</p>
+                </div>
+                <div class="flex items-center gap-2 flex-wrap">
+                    <button onclick="app.openPeriodSummaryModal()" class="px-4 py-2 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition border border-[#5B3CC4]/50 shadow-sm flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        Resumen por Periodo...
+                    </button>
+                    <button onclick="app.openClearHistoryModal()" class="px-4 py-2 bg-[#D83635] hover:bg-[#D83635]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition border border-[#D83635]/50 shadow-sm flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#FCEED2]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                        Limpiar Historial de un Mes...
+                    </button>
+                </div>
+            </div>
+            <div id="main-global-history-container" class="space-y-4 w-full">
+                <!-- Se llena mediante JS -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Modal Resumen de Todos los Movimientos por Periodo Mensual -->
+    <div id="period-summary-modal" class="fixed inset-0 bg-[#212121]/90 backdrop-blur-md hidden items-center justify-center p-4 sm:p-8 z-50 overflow-y-auto no-print">
+        <div class="bg-[#212121] border border-[#BDBDBD]/30 rounded-2xl max-w-4xl w-full flex flex-col shadow-2xl relative my-auto">
+            <div class="p-6 border-b border-[#BDBDBD]/20 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div>
+                    <h3 class="text-xl font-bold text-[#FCEED2]">Resumen General de Movimientos por Periodo</h3>
+                    <p class="text-sm text-[#BDBDBD]">Elige un mes para consultar, guardar, copiar o imprimir todos sus movimientos.</p>
+                </div>
+                <div class="flex items-center gap-3">
+                    <select id="period-summary-select" onchange="app.renderPeriodSummary()" class="px-4 py-2.5 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-sm font-semibold text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#5B3CC4]">
+                        <!-- Se llena dinámicamente -->
+                    </select>
+                </div>
+            </div>
+
+            <div id="period-summary-content" class="p-6 sm:p-10 space-y-4 text-[#FCEED2] w-full max-h-[60vh] overflow-y-auto">
+                <!-- Se inyecta por JavaScript -->
+            </div>
+
+            <div class="p-6 border-t border-[#BDBDBD]/20 bg-[#212121]/50 rounded-b-2xl flex flex-wrap justify-between items-center gap-3 no-print">
+                <button onclick="app.closePeriodSummaryModal()" class="px-5 py-2.5 bg-[#D83635] hover:bg-[#D83635]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition border border-[#D83635]/50 shadow-sm">
+                    Cerrar
+                </button>
+                <div class="flex items-center gap-3">
+                    <button onclick="app.downloadPeriodSummaryTxt()" class="px-5 py-2.5 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition border border-[#5B3CC4]/50 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                        Descargar (.TXT)
+                    </button>
+                    <button onclick="window.print()" class="px-5 py-2.5 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition border border-[#5B3CC4]/50 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                        Imprimir / PDF
+                    </button>
+                    <button onclick="app.sharePeriodSummary()" class="px-6 py-2.5 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-sm font-bold rounded-xl transition shadow border border-[#C4FF3A]/30 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3.316 3.316 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3.316 3.316 0 00-5.368-2.684z"></path></svg>
+                        Compartir / Copiar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modales Formularios -->
+    <div id="member-modal" class="fixed inset-0 bg-[#212121]/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50 no-print">
+        <div class="bg-[#212121] border border-[#BDBDBD]/30 rounded-2xl max-w-md w-full p-6 shadow-xl">
+            <h3 class="text-xl font-bold text-[#FCEED2] mb-2">Añadir Integrante</h3>
+            <p class="text-sm text-[#BDBDBD] mb-4">Nombre de la persona que recibirá parte del 60% en el corte.</p>
+            <input type="text" id="member-name-input" placeholder="Ej. Carlos, Ana..." class="w-full px-4 py-3 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-base text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#5B3CC4] mb-6 placeholder-[#BDBDBD]/50">
+            <div class="flex justify-end gap-3">
+                <button onclick="app.closeMemberModal()" class="px-4 py-2.5 text-sm font-medium text-[#FCEED2] bg-[#D83635] hover:bg-[#D83635]/80 rounded-xl transition border border-[#D83635]/50 shadow-sm">Cancelar</button>
+                <button onclick="app.saveMember()" class="px-5 py-2.5 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition shadow border border-[#5B3CC4]/50">Guardar Integrante</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Limpiar Historial por Mes -->
+    <div id="clear-history-modal" class="fixed inset-0 bg-[#212121]/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50 no-print">
+        <div class="bg-[#212121] border border-[#BDBDBD]/30 rounded-2xl max-w-md w-full p-6 shadow-xl">
+            <h3 class="text-xl font-bold text-[#FCEED2] mb-2">Limpiar Historial por Mes</h3>
+            <p class="text-sm text-[#BDBDBD] mb-4">Selecciona el periodo mensual que deseas eliminar del registro histórico.</p>
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label class="block text-sm font-semibold text-[#BDBDBD] mb-1">Mes a eliminar</label>
+                    <select id="clear-history-select" class="w-full px-4 py-3 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-base text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#D83635]">
+                        <!-- Opciones dinámicas -->
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="app.closeClearHistoryModal()" class="px-4 py-2.5 text-sm font-medium text-[#FCEED2] bg-[#212121] hover:bg-[#BDBDBD]/20 rounded-xl transition border border-[#BDBDBD]/30">Cancelar</button>
+                <button onclick="app.confirmClearHistoryMonth()" class="px-5 py-2.5 bg-[#D83635] hover:bg-[#D83635]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition shadow border border-[#D83635]/50">Eliminar Periodo</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="deposit-modal" class="fixed inset-0 bg-[#212121]/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50 no-print">
+        <div class="bg-[#212121] border border-[#BDBDBD]/30 rounded-2xl max-w-md w-full p-6 shadow-xl">
+            <h3 class="text-xl font-bold text-[#FCEED2] mb-2">Añadir Ingreso</h3>
+            <p class="text-sm text-[#BDBDBD] mb-4">Registra el ingreso que se sumará a la caja del mes.</p>
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label class="block text-sm font-semibold text-[#BDBDBD] mb-1">Cantidad ($)</label>
+                    <input type="number" id="deposit-amount" min="0" step="0.01" placeholder="0.00" class="w-full px-4 py-3 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-base text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#5B3CC4]">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-[#BDBDBD] mb-1">Cliente o Razón del Ingreso</label>
+                    <input type="text" id="deposit-reason" placeholder="Ej. Cliente Michin, Proyecto X..." class="w-full px-4 py-3 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-base text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#5B3CC4]">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-[#BDBDBD] mb-1">Descripción Adicional (Opcional)</label>
+                    <textarea id="deposit-desc" rows="2" placeholder="Notas o detalles del movimiento..." class="w-full px-4 py-3 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-base text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#5B3CC4]"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="app.closeDepositModal()" class="px-4 py-2.5 text-sm font-medium text-[#FCEED2] bg-[#D83635] hover:bg-[#D83635]/80 rounded-xl transition border border-[#D83635]/50 shadow-sm">Cancelar</button>
+                <button onclick="app.confirmDeposit()" class="px-5 py-2.5 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition shadow border border-[#5B3CC4]/50">Agregar Dinero</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Añadir Dinero Manual (Ajuste) -->
+    <div id="manual-deposit-modal" class="fixed inset-0 bg-[#212121]/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50 no-print">
+        <div class="bg-[#212121] border border-[#BDBDBD]/30 rounded-2xl max-w-md w-full p-6 shadow-xl">
+            <h3 id="manual-deposit-modal-title" class="text-xl font-bold text-[#FCEED2] mb-2">Añadir Dinero (AJUSTE MANUAL)</h3>
+            <p class="text-sm text-[#BDBDBD] mb-4">Operación especial para inyectar fondos de manera extraordinaria.</p>
+            <input type="hidden" id="manual-deposit-box-type">
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label class="block text-sm font-semibold text-[#BDBDBD] mb-1">Cantidad a Añadir ($)</label>
+                    <input type="number" id="manual-deposit-amount" min="0" step="0.01" placeholder="0.00" class="w-full px-4 py-3 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-base text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#5B3CC4]">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-[#BDBDBD] mb-1">Razón del Ajuste</label>
+                    <input type="text" id="manual-deposit-reason" placeholder="Ej. Inyección de capital externo..." class="w-full px-4 py-3 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-base text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#5B3CC4]">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-[#BDBDBD] mb-1">Breve Explicación (Opcional)</label>
+                    <textarea id="manual-deposit-desc" rows="2" placeholder="Detalles de por qué se realiza este ajuste..." class="w-full px-4 py-3 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-base text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#5B3CC4]"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="app.closeManualDepositModal()" class="px-4 py-2.5 text-sm font-medium text-[#FCEED2] bg-[#D83635] hover:bg-[#D83635]/80 rounded-xl transition border border-[#D83635]/50 shadow-sm">Cancelar</button>
+                <button onclick="app.confirmManualDeposit()" class="px-5 py-2.5 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition shadow border border-[#5B3CC4]/50">Confirmar Inyección</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="withdraw-modal" class="fixed inset-0 bg-[#212121]/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50 no-print">
+        <div class="bg-[#212121] border border-[#BDBDBD]/30 rounded-2xl max-w-md w-full p-6 shadow-xl">
+            <h3 id="withdraw-modal-title" class="text-xl font-bold text-[#FCEED2] mb-2">Retirar Fondos</h3>
+            <p class="text-sm text-[#BDBDBD] mb-4">Sustracción de capital de la caja seleccionada.</p>
+            <input type="hidden" id="withdraw-box-type">
+            <div class="space-y-4 mb-6">
+                <div>
+                    <label class="block text-sm font-semibold text-[#BDBDBD] mb-1">Cantidad a Retirar ($)</label>
+                    <input type="number" id="withdraw-amount" min="0" step="0.01" placeholder="0.00" class="w-full px-4 py-3 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-base text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#D83635]">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-[#BDBDBD] mb-1">Razón del Retiro</label>
+                    <input type="text" id="withdraw-reason" placeholder="Ej. Compra de equipo, mantenimiento..." class="w-full px-4 py-3 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-base text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#D83635]">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-[#BDBDBD] mb-1">Descripción Adicional (Opcional)</label>
+                    <textarea id="withdraw-desc" rows="2" placeholder="Detalles adicionales..." class="w-full px-4 py-3 bg-[#212121] border border-[#BDBDBD]/30 rounded-xl text-base text-[#FCEED2] focus:outline-none focus:ring-2 focus:ring-[#D83635]"></textarea>
+                </div>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="app.closeWithdrawModal()" class="px-4 py-2.5 text-sm font-medium text-[#FCEED2] bg-[#D83635] hover:bg-[#D83635]/80 rounded-xl transition border border-[#D83635]/50 shadow-sm">Cancelar</button>
+                <button onclick="app.confirmWithdraw()" class="px-5 py-2.5 bg-[#D83635] hover:bg-[#D83635]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition shadow border border-[#D83635]/50">Confirmar Retiro</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="fixed inset-0 bg-[#212121]/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50 no-print">
+        <div class="bg-[#212121] border border-[#BDBDBD]/30 rounded-2xl max-w-sm w-full p-6 shadow-xl text-center">
+            <div class="w-14 h-14 rounded-full bg-[#5B3CC4]/20 text-[#C4FF3A] border border-[#C4FF3A]/30 mx-auto flex items-center justify-center mb-3">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+            </div>
+            <h4 id="confirm-title" class="text-lg font-bold text-[#FCEED2] mb-1">Confirmar acción</h4>
+            <p id="confirm-message" class="text-sm text-[#BDBDBD] mb-6">¿Estás seguro de que deseas realizar esta acción?</p>
+            <div class="flex gap-3">
+                <button onclick="app.closeConfirmModal()" class="flex-1 py-3 bg-[#D83635] hover:bg-[#D83635]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition border border-[#D83635]/50 shadow-sm">Cancelar</button>
+                <button id="confirm-yes-btn" class="flex-1 py-3 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition shadow border border-[#5B3CC4]/50">Sí, continuar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification-modal" class="fixed inset-0 bg-[#212121]/80 backdrop-blur-sm hidden items-center justify-center p-4 z-50 no-print">
+        <div class="bg-[#212121] border border-[#BDBDBD]/30 rounded-2xl max-w-sm w-full p-6 shadow-xl text-center">
+            <div id="notification-icon" class="w-14 h-14 rounded-full bg-[#5B3CC4]/20 text-[#C4FF3A] border border-[#C4FF3A]/30 mx-auto flex items-center justify-center mb-3">
+                <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+            </div>
+            <h4 id="notification-title" class="text-lg font-bold text-[#FCEED2] mb-1">Atención</h4>
+            <p id="notification-message" class="text-sm text-[#BDBDBD] mb-6">Mensaje del sistema.</p>
+            <button onclick="app.closeNotification()" class="w-full py-3 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-base font-semibold rounded-xl transition border border-[#5B3CC4]/50 shadow-sm">Entendido</button>
+        </div>
+    </div>
+
+    <!-- REPORTE MODAL (CORTE) -->
+    <div id="report-modal" class="fixed inset-0 bg-[#212121]/90 backdrop-blur-md hidden items-center justify-center p-4 sm:p-8 z-50 overflow-y-auto">
+        <div class="bg-[#212121] border border-[#BDBDBD]/30 rounded-2xl max-w-4xl w-full flex flex-col shadow-2xl relative my-auto">
+            
+            <div id="report-success-banner" class="hidden bg-[#5B3CC4] text-[#FCEED2] px-6 py-3.5 rounded-t-2xl font-semibold text-center items-center justify-center gap-2.5 no-print border-b border-[#C4FF3A]/30 text-base">
+                <svg class="w-5 h-5 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                ¡Los datos han sido actualizados y distribuidos con éxito!
+            </div>
+
+            <div id="report-content" class="p-6 sm:p-10 space-y-8 text-[#FCEED2] w-full">
+                <!-- Se inyecta por JavaScript -->
+            </div>
+
+            <div id="report-actions-preview" class="p-6 border-t border-[#BDBDBD]/20 bg-[#212121]/50 rounded-b-2xl flex flex-col sm:flex-row justify-between items-center gap-3 no-print">
+                <div id="report-restriction-msg" class="text-sm font-semibold">
+                    <!-- Dinámico según fecha -->
+                </div>
+                <div class="flex items-center gap-3">
+                    <button onclick="app.cancelCorteMensual()" class="px-5 py-3 bg-[#D83635] hover:bg-[#D83635]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition border border-[#D83635]/50 shadow-sm">
+                        Cancelar
+                    </button>
+                    <button id="apply-cut-btn" onclick="app.applyCorteMensual()" class="px-6 py-3 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-sm font-bold rounded-xl transition shadow border border-[#5B3CC4]/50 flex items-center gap-2">
+                        <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                        Aceptar y Distribuir
+                    </button>
+                </div>
+            </div>
+
+            <div id="report-actions-done" class="hidden p-6 border-t border-[#BDBDBD]/20 bg-[#212121]/50 rounded-b-2xl flex justify-end gap-3 no-print">
+                <button onclick="app.closeReportModal()" class="px-5 py-3 bg-[#D83635] hover:bg-[#D83635]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition border border-[#D83635]/50 shadow-sm">
+                    Cerrar
+                </button>
+                <button onclick="window.print()" class="px-5 py-3 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-sm font-semibold rounded-xl transition border border-[#5B3CC4]/50 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>
+                    Imprimir / PDF
+                </button>
+                <button onclick="app.shareReport()" class="px-6 py-3 bg-[#5B3CC4] hover:bg-[#5B3CC4]/80 text-[#FCEED2] text-sm font-bold rounded-xl transition shadow border border-[#C4FF3A]/30 flex items-center gap-2">
+                    <svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3.316 3.316 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3.316 3.316 0 00-5.368-2.684z"></path></svg>
+                    Compartir / Copiar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        class TabuladorFinancieroApp {
+            constructor() {
+                this.storageKey = 'tabulador_ingresos_egresos_v24';
+                this.pendingCut = null;
+                this.currentPeriodSummaryData = null;
+                
+                const loaded = this.loadData();
+                this.members = loaded.members || [];
+                
+                this.cajaIngresos = loaded.cajaIngresos || { balance: 0, rawTotal: 0, periodInterest: 0, history: [] };
+                this.cajaOperativos = loaded.cajaOperativos || { balance: 0, periodInterest: 0, periodWithdrawals: 0, history: [] };
+                this.cajaReinversion = loaded.cajaReinversion || { balance: 0, periodInterest: 0, periodWithdrawals: 0, history: [] };
+                this.cajaIVA = loaded.cajaIVA || { balance: 0, periodInterest: 0, periodWithdrawals: 0, history: [] };
+                
+                this.globalHistory = loaded.globalHistory || [];
+                
+                if(this.cajaOperativos.periodInterest === undefined) this.cajaOperativos.periodInterest = 0;
+                if(this.cajaOperativos.periodWithdrawals === undefined) this.cajaOperativos.periodWithdrawals = 0;
+                if(this.cajaReinversion.periodInterest === undefined) this.cajaReinversion.periodInterest = 0;
+                if(this.cajaReinversion.periodWithdrawals === undefined) this.cajaReinversion.periodWithdrawals = 0;
+                if(this.cajaIngresos.periodInterest === undefined) this.cajaIngresos.periodInterest = 0;
+                if(this.cajaIVA.periodInterest === undefined) this.cajaIVA.periodInterest = 0;
+                if(this.cajaIVA.periodWithdrawals === undefined) this.cajaIVA.periodWithdrawals = 0;
+
+                this.lastInterestCalculation = loaded.lastInterestCalculation || null;
+                this.lastCutTimestamp = loaded.lastCutTimestamp || null;
+
+                this.init();
+                this.checkDailyInterest();
+                
+                setInterval(() => this.updateLiveClockAndCountdowns(), 1000);
+            }
+
+            loadData() {
+                try {
+                    const saved = localStorage.getItem(this.storageKey);
+                    if (saved) return JSON.parse(saved);
+                } catch (e) { console.error("Error loading storage", e); }
+                return {};
+            }
+
+            saveData() {
+                try {
+                    const bundle = {
+                        members: this.members,
+                        cajaIngresos: this.cajaIngresos,
+                        cajaOperativos: this.cajaOperativos,
+                        cajaReinversion: this.cajaReinversion,
+                        cajaIVA: this.cajaIVA,
+                        globalHistory: this.globalHistory,
+                        lastInterestCalculation: this.lastInterestCalculation,
+                        lastCutTimestamp: this.lastCutTimestamp
+                    };
+                    localStorage.setItem(this.storageKey, JSON.stringify(bundle));
+                } catch (e) { console.error("Error saving storage", e); }
+            }
+
+            parseDateEsMX(dateStr) {
+                const now = new Date();
+                if (!dateStr) return now;
+                const cleanStr = dateStr.replace(',', '').trim();
+                const match = cleanStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                if (match) {
+                    const day = parseInt(match, 10);
+                    const month = parseInt(match[2], 10) - 1;
+                    const year = parseInt(match[3], 10);
+                    return new Date(year, month, day);
+                }
+                const d = new Date(dateStr);
+                return !isNaN(d.getTime()) ? d : now;
+            }
+
+            checkDailyInterest() {
+                const now = new Date();
+                const dailyRate = 0.065 / 360; // Base comercial 360 de Nu
+
+                const processBox = (box, boxName) => {
+                    if (!box.lastInterestTimestamp) {
+                        if (box.history && box.history.length > 0) {
+                            const oldestMov = box.history[0];
+                            const parsedDate = this.parseDateEsMX(oldestMov.date);
+                            box.lastInterestTimestamp = parsedDate.getTime();
+                        } else {
+                            box.lastInterestTimestamp = now.getTime();
+                            return;
+                        }
+                    }
+
+                    const elapsedMs = now.getTime() - box.lastInterestTimestamp;
+                    const hoursElapsed = elapsedMs / (1000 * 60 * 60);
+
+                    if (hoursElapsed >= 24) {
+                        const cyclesCompleted = Math.floor(hoursElapsed / 24);
+                        const interest = box.balance * dailyRate * cyclesCompleted;
+
+                        if (interest > 0) {
+                            box.balance += interest;
+                            box.periodInterest += interest;
+                            box.lastInterestTimestamp += (cyclesCompleted * 24 * 60 * 60 * 1000);
+
+                            const mov = { 
+                                type: 'INTERES_6.5%', 
+                                amount: interest, 
+                                date: new Date().toLocaleString('es-MX'), 
+                                reason: 'Rendimiento diario 6.5% anual (Nu)', 
+                                box: boxName 
+                            };
+                            box.history.push(mov);
+                            this.globalHistory.unshift(mov);
+                        }
+                    }
+                };
+
+                processBox(this.cajaIngresos, 'Caja Ingresos');
+                processBox(this.cajaOperativos, 'Gastos Operativos');
+                processBox(this.cajaReinversion, 'Reinversión');
+                processBox(this.cajaIVA, 'IVA');
+
+                this.saveData();
+                this.renderBoxes();
+                this.renderGlobalHistory();
+            }
+
+            updateLiveClockAndCountdowns() {
+                const now = new Date();
+                
+                const dateOptions = { year: 'numeric', month: '2-digit', day: '2-digit' };
+                const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
+                const dateStr = now.toLocaleDateString('es-MX', dateOptions);
+                const timeStr = now.toLocaleTimeString('es-MX', timeOptions);
+                document.getElementById('clock-text').innerText = `${dateStr} ${timeStr}`;
+
+                const nextMidnight = new Date(now);
+                nextMidnight.setHours(24, 0, 0, 0);
+                const diffMs = nextMidnight - now;
+
+                const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                const seconds = Math.floor((diffMs % (1000 * 60)) / 1000);
+
+                const countdownFormatted = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+                
+                const countdownEl1 = document.getElementById('caja-ingresos-countdown');
+                const countdownEl2 = document.getElementById('caja-operativos-countdown');
+                const countdownEl3 = document.getElementById('caja-reinversion-countdown');
+                const countdownEl4 = document.getElementById('caja-iva-countdown');
+                
+                if(countdownEl1) countdownEl1.innerText = `Actualización en: ${countdownFormatted}`;
+                if(countdownEl2) countdownEl2.innerText = `Actualización en: ${countdownFormatted}`;
+                if(countdownEl3) countdownEl3.innerText = `Actualización en: ${countdownFormatted}`;
+                if(countdownEl4) countdownEl4.innerText = `Actualización en: ${countdownFormatted}`;
+
+                this.checkDailyInterest();
+            }
+
+            exportDataFile() {
+                const bundle = {
+                    members: this.members,
+                    cajaIngresos: this.cajaIngresos,
+                    cajaOperativos: this.cajaOperativos,
+                    cajaReinversion: this.cajaReinversion,
+                    cajaIVA: this.cajaIVA,
+                    globalHistory: this.globalHistory,
+                    lastInterestCalculation: this.lastInterestCalculation,
+                    lastCutTimestamp: this.lastCutTimestamp
+                };
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(bundle, null, 2));
+                const a = document.createElement('a');
+                a.href = dataStr;
+                
+                const now = new Date();
+                const yyyy = now.getFullYear();
+                const mm = String(now.getMonth() + 1).padStart(2, '0');
+                const dd = String(now.getDate()).padStart(2, '0');
+                const hh = String(now.getHours()).padStart(2, '0');
+                const min = String(now.getMinutes()).padStart(2, '0');
+                const ss = String(now.getSeconds()).padStart(2, '0');
+                
+                a.download = `Ingresos_Egresos_Sabotage_(${yyyy}-${mm}-${dd}_${hh}-${min}-${ss}).json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                this.notify("Archivo guardado", "Los datos financieros se han descargado correctamente.", "success");
+            }
+
+            importDataFile(event) {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                this.showConfirm("Cargar Archivo", `¿Deseas cargar "${file.name}"? Esto sobrescribirá los datos actuales del tabulador.`, () => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const parsed = JSON.parse(e.target.result);
+                            if (parsed && typeof parsed === 'object') {
+                                localStorage.setItem(this.storageKey, JSON.stringify(parsed));
+                                location.reload();
+                            } else {
+                                this.notify("Archivo inválido", "El formato no es compatible.");
+                            }
+                        } catch (err) {
+                            this.notify("Error", "No se pudo procesar el archivo seleccionado.");
+                        }
+                    };
+                    reader.readAsText(file);
+                });
+                event.target.value = '';
+            }
+
+            confirmResetData() {
+                this.showConfirm("Restaurar Sistema", "¿Estás seguro de que deseas restablecer todo el tabulador? Esta acción no se puede deshacer.", () => this.resetData());
+            }
+
+            resetData() {
+                localStorage.removeItem(this.storageKey);
+                location.reload();
+            }
+
+            init() {
+                this.renderMembers();
+                this.renderBoxes();
+                this.renderGlobalHistory();
+            }
+
+            showConfirm(title, message, onConfirm) {
+                document.getElementById('confirm-title').innerText = title;
+                document.getElementById('confirm-message').innerText = message;
+                const yesBtn = document.getElementById('confirm-yes-btn');
+                yesBtn.onclick = () => { this.closeConfirmModal(); onConfirm(); };
+                document.getElementById('confirm-modal').classList.remove('hidden');
+                document.getElementById('confirm-modal').classList.add('flex');
+            }
+
+            closeConfirmModal() {
+                document.getElementById('confirm-modal').classList.remove('flex');
+                document.getElementById('confirm-modal').classList.add('hidden');
+            }
+
+            notify(title, message, type = 'warning') {
+                document.getElementById('notification-title').innerText = title;
+                document.getElementById('notification-message').innerText = message;
+                const iconContainer = document.getElementById('notification-icon');
+                iconContainer.className = 'w-14 h-14 rounded-full bg-[#5B3CC4]/20 text-[#C4FF3A] border border-[#C4FF3A]/30 mx-auto flex items-center justify-center mb-3';
+                iconContainer.innerHTML = '<svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+                document.getElementById('notification-modal').classList.remove('hidden');
+                document.getElementById('notification-modal').classList.add('flex');
+            }
+
+            closeNotification() {
+                document.getElementById('notification-modal').classList.remove('flex');
+                document.getElementById('notification-modal').classList.add('hidden');
+            }
+
+            openMemberModal() { document.getElementById('member-name-input').value = ''; document.getElementById('member-modal').classList.remove('hidden'); document.getElementById('member-modal').classList.add('flex'); document.getElementById('member-name-input').focus(); }
+            closeMemberModal() { document.getElementById('member-modal').classList.remove('flex'); document.getElementById('member-modal').classList.add('hidden'); }
+            saveMember() {
+                const name = document.getElementById('member-name-input').value.trim();
+                if (!name) return this.notify("Campo vacío", "Ingresa un nombre para el integrante.");
+                this.members.push({ id: 'mem_' + Date.now(), name: name });
+                this.saveData(); this.closeMemberModal(); this.renderMembers();
+            }
+            confirmDeleteMember(memberId) {
+                const mem = this.members.find(m => m.id === memberId);
+                this.showConfirm("Retirar Integrante", `¿Estás seguro de que deseas retirar a "${mem.name}"?`, () => {
+                    this.members = this.members.filter(m => m.id !== memberId);
+                    this.saveData(); this.renderMembers();
+                });
+            }
+            renderMembers() {
+                const container = document.getElementById('members-container');
+                if (this.members.length === 0) return container.innerHTML = '<p class="text-sm text-[#BDBDBD] italic">No hay integrantes añadidos aún.</p>';
+                container.innerHTML = this.members.map(m => `
+                    <div class="bg-[#212121] border border-[#BDBDBD]/30 px-3.5 py-2 rounded-xl flex items-center gap-2.5 text-sm text-[#FCEED2]">
+                        <span class="font-semibold">${m.name}</span>
+                        <button onclick="app.confirmDeleteMember('${m.id}')" class="text-[#BDBDBD] hover:text-[#D83635] transition" title="Retirar integrante"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                    </div>`).join('');
+            }
+
+            openDepositModal() { document.getElementById('deposit-amount').value = ''; document.getElementById('deposit-reason').value = ''; document.getElementById('deposit-desc').value = ''; document.getElementById('deposit-modal').classList.remove('hidden'); document.getElementById('deposit-modal').classList.add('flex'); }
+            closeDepositModal() { document.getElementById('deposit-modal').classList.remove('flex'); document.getElementById('deposit-modal').classList.add('hidden'); }
+            confirmDeposit() {
+                const amount = parseFloat(document.getElementById('deposit-amount').value);
+                const reason = document.getElementById('deposit-reason').value.trim();
+                const desc = document.getElementById('deposit-desc').value.trim();
+                if (isNaN(amount) || amount <= 0 || !reason) return this.notify("Datos incompletos", "Ingresa una cantidad válida y el cliente o razón del ingreso.");
+                this.showConfirm("Añadir Dinero", `¿Estás seguro de que deseas añadir $${amount.toFixed(2)} por "${reason}" a los ingresos de este mes?`, () => {
+                    this.cajaIngresos.balance += amount; this.cajaIngresos.rawTotal += amount;
+                    const mov = { type: 'INGRESO', amount: amount, reason: reason, description: desc, date: new Date().toLocaleString('es-MX'), box: 'Caja Ingresos' };
+                    this.cajaIngresos.history.push(mov);
+                    this.globalHistory.unshift(mov);
+                    this.saveData(); this.closeDepositModal(); this.renderBoxes(); this.renderGlobalHistory();
+                    this.notify("Ingreso registrado", `Se han sumado $${amount.toFixed(2)} correctamente.`, "success");
+                });
+            }
+
+            openManualDepositModal(boxType) {
+                document.getElementById('manual-deposit-box-type').value = boxType;
+                document.getElementById('manual-deposit-amount').value = '';
+                document.getElementById('manual-deposit-reason').value = '';
+                document.getElementById('manual-deposit-desc').value = '';
+                const boxName = boxType === 'operativos' ? 'Gastos Operativos' : boxType === 'reinversion' ? 'Reinversión' : 'IVA';
+                document.getElementById('manual-deposit-modal-title').innerText = `Añadir Dinero (${boxName})`;
+                document.getElementById('manual-deposit-modal').classList.remove('hidden');
+                document.getElementById('manual-deposit-modal').classList.add('flex');
+            }
+
+            closeManualDepositModal() {
+                document.getElementById('manual-deposit-modal').classList.remove('flex');
+                document.getElementById('manual-deposit-modal').classList.add('hidden');
+            }
+
+            confirmManualDeposit() {
+                const boxType = document.getElementById('manual-deposit-box-type').value;
+                const amount = parseFloat(document.getElementById('manual-deposit-amount').value);
+                const reason = document.getElementById('manual-deposit-reason').value.trim();
+                const desc = document.getElementById('manual-deposit-desc').value.trim();
+                const boxName = boxType === 'operativos' ? 'Gastos Operativos' : boxType === 'reinversion' ? 'Reinversión' : 'IVA';
+
+                if (isNaN(amount) || amount <= 0 || !reason) {
+                    return this.notify("Datos incompletos", "Ingresa una cantidad válida y la razón del ajuste.");
+                }
+
+                this.showConfirm(`Confirmar Ajuste (${boxName})`, `¿Estás seguro de que deseas añadir $${amount.toFixed(2)} a ${boxName} mediante un ajuste manual?`, () => {
+                    const targetBox = boxType === 'operativos' ? this.cajaOperativos : boxType === 'reinversion' ? this.cajaReinversion : this.cajaIVA;
+                    targetBox.balance += amount;
+
+                    const mov = { 
+                        type: 'AJUSTE MANUAL', 
+                        amount: amount, 
+                        reason: reason, 
+                        description: desc, 
+                        date: new Date().toLocaleString('es-MX'), 
+                        box: boxName 
+                    };
+
+                    targetBox.history.push(mov);
+                    this.globalHistory.unshift(mov);
+                    this.saveData();
+                    this.closeManualDepositModal();
+                    this.renderBoxes();
+                    this.renderGlobalHistory();
+                    this.notify("Ajuste registrado", `Se han añadido $${amount.toFixed(2)} a ${boxName} correctamente como AJUSTE MANUAL.`, "success");
+                });
+            }
+
+            openWithdrawModal(boxType) {
+                document.getElementById('withdraw-box-type').value = boxType; 
+                document.getElementById('withdraw-amount').value = ''; 
+                document.getElementById('withdraw-reason').value = ''; 
+                document.getElementById('withdraw-desc').value = '';
+                document.getElementById('withdraw-modal-title').innerText = boxType === 'operativos' ? 'Retirar de Gastos Operativos' : boxType === 'reinversion' ? 'Retirar de Reinversión' : 'Retirar de IVA';
+                document.getElementById('withdraw-modal').classList.remove('hidden'); 
+                document.getElementById('withdraw-modal').classList.add('flex');
+            }
+
+            closeWithdrawModal() { document.getElementById('withdraw-modal').classList.remove('flex'); document.getElementById('withdraw-modal').classList.add('hidden'); }
+            
+            confirmWithdraw() {
+                const boxType = document.getElementById('withdraw-box-type').value;
+                const amount = parseFloat(document.getElementById('withdraw-amount').value);
+                const reason = document.getElementById('withdraw-reason').value.trim();
+                const desc = document.getElementById('withdraw-desc').value.trim();
+                if (isNaN(amount) || amount <= 0 || !reason) return this.notify("Datos incompletos", "Ingresa una cantidad válida y la razón del retiro.");
+
+                const targetBox = boxType === 'operativos' ? this.cajaOperativos : boxType === 'reinversion' ? this.cajaReinversion : this.cajaIVA;
+                const boxName = boxType === 'operativos' ? 'Gastos Operativos' : boxType === 'reinversion' ? 'Reinversión' : 'IVA';
+
+                if (amount > targetBox.balance) return this.notify("Fondos insuficientes", `No puedes retirar $${amount.toFixed(2)} porque el saldo en ${boxName} es $${targetBox.balance.toFixed(2)}.`);
+
+                this.showConfirm(`Retirar Fondos (${boxName})`, `¿Estás seguro de realizar un retiro por $${amount.toFixed(2)} en ${boxName}?`, () => {
+                    targetBox.balance -= amount;
+                    targetBox.periodWithdrawals += amount;
+                    const mov = { type: 'RETIRO', amount: amount, reason: reason, description: desc, date: new Date().toLocaleString('es-MX'), box: boxName };
+                    targetBox.history.push(mov);
+                    this.globalHistory.unshift(mov);
+                    this.saveData(); this.closeWithdrawModal(); this.renderBoxes(); this.renderGlobalHistory();
+                    this.notify("Retiro exitoso", `Se han sustraído $${amount.toFixed(2)} de ${boxName}.`, "success");
+                });
+            }
+
+            renderBoxes() {
+                const f = (n) => '$' + n.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                
+                document.getElementById('caja-ingresos-total').innerText = f(this.cajaIngresos.balance);
+                document.getElementById('caja-ingresos-interest').innerHTML = `<svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg><span class="text-[#C4FF3A]">Generado 6.5%: +${f(this.cajaIngresos.periodInterest)}</span>`;
+
+                document.getElementById('caja-operativos-total').innerText = f(this.cajaOperativos.balance);
+                document.getElementById('caja-operativos-interest').innerHTML = `<svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg><span class="text-[#C4FF3A]">Generado 6.5%: +${f(this.cajaOperativos.periodInterest)}</span>`;
+
+                document.getElementById('caja-reinversion-total').innerText = f(this.cajaReinversion.balance);
+                document.getElementById('caja-reinversion-interest').innerHTML = `<svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg><span class="text-[#C4FF3A]">Generado 6.5%: +${f(this.cajaReinversion.periodInterest)}</span>`;
+
+                document.getElementById('caja-iva-total').innerText = f(this.cajaIVA.balance);
+                document.getElementById('caja-iva-interest').innerHTML = `<svg class="w-4 h-4 text-[#C4FF3A]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg><span class="text-[#C4FF3A]">Generado 6.5%: +${f(this.cajaIVA.periodInterest)}</span>`;
+            }
+
+            renderGlobalHistory() {
+                const container = document.getElementById('main-global-history-container');
+                if (!container) return;
+
+                if (this.globalHistory.length === 0) {
+                    container.innerHTML = `<p class="text-sm text-[#BDBDBD] italic text-center py-4">No hay movimientos registrados en el historial.</p>`;
+                    return;
+                }
+
+                const grouped = {};
+                this.globalHistory.forEach(m => {
+                    const monthKey = this.extractMonthYearKey(m.date);
+                    if (!grouped[monthKey]) grouped[monthKey] = [];
+                    grouped[monthKey].push(m);
+                });
+
+                let html = '';
+                for (const [monthLabel, movements] of Object.entries(grouped)) {
+                    html += `
+                        <div class="space-y-3">
+                            <div class="bg-[#212121] px-4 py-2.5 rounded-xl border border-[#BDBDBD]/30 flex items-center justify-between">
+                                <span class="text-sm font-bold text-[#FCEED2] uppercase tracking-wide flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-[#5B3CC4]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                                    Periodo Mensual: ${monthLabel}
+                                </span>
+                                <span class="text-xs text-[#BDBDBD] font-medium">${movements.length} movimiento(s)</span>
+                            </div>
+                            <div class="bg-[#212121] border border-[#BDBDBD]/20 rounded-xl p-4 space-y-3 divide-y divide-[#BDBDBD]/10">
+                    `;
+
+                    movements.forEach(m => {
+                        let badgeColor = 'bg-[#212121] text-[#BDBDBD] border border-[#BDBDBD]/30';
+                        if (m.type === 'INGRESO') badgeColor = 'bg-[#5B3CC4]/20 text-[#C4FF3A] border border-[#C4FF3A]/30';
+                        else if (m.type === 'RETIRO') badgeColor = 'bg-[#D83635]/20 text-[#D83635] border border-[#D83635]/30';
+                        else if (m.type === 'AJUSTE MANUAL') badgeColor = 'bg-[#D83635]/30 text-[#FCEED2] border border-[#D83635] font-extrabold';
+                        else if (m.type === 'CORTE') badgeColor = 'bg-[#5B3CC4]/30 text-[#FCEED2] border border-[#5B3CC4]/50';
+                        else if (m.type.includes('INTERES')) badgeColor = 'bg-[#5B3CC4]/20 text-[#C4FF3A] border border-[#C4FF3A]/30';
+                        else if (m.type.includes('REPARTO')) badgeColor = 'bg-[#5B3CC4]/20 text-[#C4FF3A] border border-[#C4FF3A]/30';
+
+                        html += `
+                            <div class="pt-3 first:pt-0 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1.5">
+                                <div>
+                                    <div class="flex items-center gap-2.5">
+                                        <span class="px-2.5 py-1 rounded text-xs font-bold uppercase ${badgeColor}">${m.type}</span>
+                                        <span class="font-semibold text-[#FCEED2] text-sm">${m.reason || m.box}</span>
+                                        <span class="text-xs text-[#BDBDBD]">(${m.box || 'General'})</span>
+                                    </div>
+                                    ${m.description ? `<p class="text-[#BDBDBD] text-xs mt-1 ml-1">Nota: ${m.description}</p>` : ''}
+                                    <span class="text-xs text-[#BDBDBD]/70 block mt-1 ml-1">${m.date}</span>
+                                </div>
+                                <span class="font-bold text-[#FCEED2] text-base self-end sm:self-center">$${Number(m.amount || 0).toFixed(2)}</span>
+                            </div>
+                        `;
+                    });
+
+                    html += `</div></div>`;
+                }
+
+                container.innerHTML = html;
+            }
+
+            extractMonthYearKey(dateStr) {
+                try {
+                    if (!dateStr) return new Date().toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }).toUpperCase();
+                    const cleanStr = dateStr.replace(',', '').trim();
+                    const match = cleanStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+                    if (match) {
+                        const day = parseInt(match, 10);
+                        const month = parseInt(match[2], 10) - 1;
+                        const year = parseInt(match[3], 10);
+                        const d = new Date(year, month, day);
+                        return d.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }).toUpperCase();
+                    }
+                    const d = new Date(dateStr);
+                    if (!isNaN(d.getTime())) {
+                        const options = { month: 'long', year: 'numeric' };
+                        return d.toLocaleDateString('es-MX', options).toUpperCase();
+                    }
+                } catch(e) {}
+                const now = new Date();
+                return now.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' }).toUpperCase();
+            }
+
+            openPeriodSummaryModal() {
+                const select = document.getElementById('period-summary-select');
+                select.innerHTML = '';
+
+                const months = {};
+                this.globalHistory.forEach(m => {
+                    const key = this.extractMonthYearKey(m.date);
+                    months[key] = true;
+                });
+
+                const keys = Object.keys(months);
+                if (keys.length === 0) {
+                    return this.notify("Historial vacío", "No hay movimientos registrados para generar un resumen por periodo.");
+                }
+
+                keys.forEach(k => {
+                    const opt = document.createElement('option');
+                    opt.value = k;
+                    opt.innerText = k;
+                    select.appendChild(opt);
+                });
+
+                document.getElementById('period-summary-modal').classList.remove('hidden');
+                document.getElementById('period-summary-modal').classList.add('flex');
+                this.renderPeriodSummary();
+            }
+
+            closePeriodSummaryModal() {
+                document.getElementById('period-summary-modal').classList.remove('flex');
+                document.getElementById('period-summary-modal').classList.add('hidden');
+            }
+
+            renderPeriodSummary() {
+                const select = document.getElementById('period-summary-select');
+                const selectedMonth = select.value;
+                const container = document.getElementById('period-summary-content');
+
+                if (!selectedMonth) return;
+
+                const movements = this.globalHistory.filter(m => this.extractMonthYearKey(m.date) === selectedMonth);
+
+                let totalIngresos = 0;
+                let totalRetiros = 0;
+
+                movements.forEach(m => {
+                    const amt = Number(m.amount || 0);
+                    if (m.type === 'INGRESO') totalIngresos += amt;
+                    else if (m.type === 'RETIRO') totalRetiros += amt;
+                });
+
+                const saldoOperativos = this.cajaOperativos.balance;
+                const saldoReinversion = this.cajaReinversion.balance;
+                const saldoIVA = this.cajaIVA.balance;
+
+                const f = (num) => `$${num.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+
+                let txtBody = `=======================================\n`;
+                txtBody += `RESUMEN GENERAL DE MOVIMIENTOS: ${selectedMonth}\n`;
+                txtBody += `Fecha de generación: ${new Date().toLocaleString('es-MX')}\n`;
+                txtBody += `=======================================\n\n`;
+                txtBody += `SALDOS ACTUALES DE CAJAS (Al momento de consulta):\n`;
+                txtBody += `- Gastos Operativos: ${f(saldoOperativos)}\n`;
+                txtBody += `- Reinversión: ${f(saldoReinversion)}\n`;
+                txtBody += `- IVA: ${f(saldoIVA)}\n\n`;
+
+                let html = `
+                    <div class="print-section-block border-b border-[#BDBDBD]/20 print-border pb-4 mb-4">
+                        <h2 class="text-2xl font-bold text-[#FCEED2] print-text">Resumen de Movimientos: ${selectedMonth}</h2>
+                        <p class="text-sm text-[#BDBDBD] print-text-muted mt-1">Generado el ${new Date().toLocaleString('es-MX')}</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+                        <div class="bg-[#212121] print-card rounded-xl p-4 border border-[#BDBDBD]/20">
+                            <p class="text-xs text-[#BDBDBD] print-text-muted mb-1">Total Ingresos</p>
+                            <p class="text-xl font-bold text-[#C4FF3A] print-text print-text-lime">+ ${f(totalIngresos)}</p>
+                        </div>
+                        <div class="bg-[#212121] print-card rounded-xl p-4 border border-[#BDBDBD]/20">
+                            <p class="text-xs text-[#BDBDBD] print-text-muted mb-1">Total Retiros</p>
+                            <p class="text-xl font-bold text-[#D83635] print-text print-text-red">- ${f(totalRetiros)}</p>
+                        </div>
+                        <div class="bg-[#212121] print-card rounded-xl p-4 border border-[#BDBDBD]/20">
+                            <p class="text-xs text-[#BDBDBD] print-text-muted mb-1">Total Movimientos</p>
+                            <p class="text-xl font-bold text-[#FCEED2] print-text">${movements.length} registro(s)</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                        <div class="bg-[#212121] print-card rounded-xl p-4 border border-[#5B3CC4]/40">
+                            <p class="text-xs text-[#BDBDBD] print-text-muted mb-1">Saldo en Gastos Operativos</p>
+                            <p class="text-xl font-bold text-[#FCEED2] print-text">${f(saldoOperativos)}</p>
+                        </div>
+                        <div class="bg-[#212121] print-card rounded-xl p-4 border border-[#5B3CC4]/40">
+                            <p class="text-xs text-[#BDBDBD] print-text-muted mb-1">Saldo en Reinversión</p>
+                            <p class="text-xl font-bold text-[#FCEED2] print-text">${f(saldoReinversion)}</p>
+                        </div>
+                        <div class="bg-[#212121] print-card rounded-xl p-4 border border-[#5B3CC4]/40">
+                            <p class="text-xs text-[#BDBDBD] print-text-muted mb-1">Saldo en IVA (Independiente)</p>
+                            <p class="text-xl font-bold text-[#FCEED2] print-text">${f(saldoIVA)}</p>
+                        </div>
+                    </div>
+
+                    <div class="print-section-block space-y-2">
+                        <h4 class="text-sm font-bold text-[#FCEED2] print-text uppercase tracking-wider mb-3">Detalle Cronológico (${movements.length})</h4>
+                `;
+
+                if (movements.length === 0) {
+                    html += `<p class="text-sm text-[#BDBDBD] italic">No hay movimientos en este periodo.</p>`;
+                } else {
+                    movements.forEach(m => {
+                        let badgeColor = 'bg-[#212121] text-[#BDBDBD] border border-[#BDBDBD]/30';
+                        if (m.type === 'INGRESO') badgeColor = 'bg-[#5B3CC4]/20 text-[#C4FF3A] border border-[#C4FF3A]/30';
+                        else if (m.type === 'RETIRO') badgeColor = 'bg-[#D83635]/20 text-[#D83635] border border-[#D83635]/30';
+                        else if (m.type === 'AJUSTE MANUAL') badgeColor = 'bg-[#D83635]/30 text-[#FCEED2] border border-[#D83635] font-extrabold';
+                        else if (m.type === 'CORTE') badgeColor = 'bg-[#5B3CC4]/30 text-[#FCEED2] border border-[#5B3CC4]/50';
+                        else if (m.type.includes('INTERES')) badgeColor = 'bg-[#5B3CC4]/20 text-[#C4FF3A] border border-[#C4FF3A]/30';
+                        else if (m.type.includes('REPARTO')) badgeColor = 'bg-[#5B3CC4]/20 text-[#C4FF3A] border border-[#C4FF3A]/30';
+
+                        html += `
+                            <div class="flex justify-between items-center bg-[#212121] print-card p-3 rounded-xl border border-[#BDBDBD]/10 mb-2">
+                                <div>
+                                    <div class="flex items-center gap-2.5">
+                                        <span class="px-2.5 py-1 rounded text-xs font-bold uppercase ${badgeColor}">${m.type}</span>
+                                        <span class="font-semibold text-[#FCEED2] print-text text-sm">${m.reason || m.box}</span>
+                                        <span class="text-xs text-[#BDBDBD] print-text-muted">(${m.box || 'General'})</span>
+                                    </div>
+                                    ${m.description ? `<p class="text-[#BDBDBD] print-text-muted text-xs mt-1 ml-1">Nota: ${m.description}</p>` : ''}
+                                    <span class="text-xs text-[#BDBDBD]/60 print-text-muted block mt-1 ml-1">${m.date}</span>
+                                </div>
+                                <span class="font-bold text-[#FCEED2] print-text text-base">$${Number(m.amount || 0).toFixed(2)}</span>
+                            </div>
+                        `;
+
+                        txtBody += `[${m.date}] [${m.type}] ${m.reason || m.box} (${m.box || 'General'}): $${Number(m.amount || 0).toFixed(2)} ${m.description ? '- ' + m.description : ''}\n`;
+                    });
+                }
+
+                html += `</div>`;
+                txtBody += `\nRESUMEN: Ingresos: ${f(totalIngresos)} | Retiros: ${f(totalRetiros)} | Total Movimientos: ${movements.length}\n`;
+
+                container.innerHTML = html;
+                this.currentPeriodSummaryData = { selectedMonth, text: txtBody };
+            }
+
+            downloadPeriodSummaryTxt() {
+                if (!this.currentPeriodSummaryData) return;
+                const blob = new Blob([this.currentPeriodSummaryData.text], { type: 'text/plain;charset=utf-8' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                const safeName = this.currentPeriodSummaryData.selectedMonth.replace(/\s+/g, '_');
+                a.download = `Resumen_Movimientos_${safeName}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                this.notify("Descarga lista", "El archivo de texto se ha descargado.", "success");
+            }
+
+            sharePeriodSummary() {
+                if (!this.currentPeriodSummaryData) return;
+                const text = this.currentPeriodSummaryData.text;
+                if (navigator.share && navigator.canShare) {
+                    navigator.share({ title: `Resumen de Movimientos`, text }).catch(() => this.copiarPortapapeles(text));
+                } else {
+                    this.copiarPortapapeles(text);
+                }
+            }
+
+            openClearHistoryModal() {
+                const select = document.getElementById('clear-history-select');
+                select.innerHTML = '';
+
+                const months = {};
+                this.globalHistory.forEach(m => {
+                    const key = this.extractMonthYearKey(m.date);
+                    months[key] = true;
+                });
+
+                const keys = Object.keys(months);
+                if (keys.length === 0) {
+                    return this.notify("Historial vacío", "No hay ningún periodo histórico registrado para eliminar.");
+                }
+
+                keys.forEach(k => {
+                    const opt = document.createElement('option');
+                    opt.value = k;
+                    opt.innerText = k;
+                    select.appendChild(opt);
+                });
+
+                document.getElementById('clear-history-modal').classList.remove('hidden');
+                document.getElementById('clear-history-modal').classList.add('flex');
+            }
+
+            closeClearHistoryModal() {
+                document.getElementById('clear-history-modal').classList.remove('flex');
+                document.getElementById('clear-history-modal').classList.add('hidden');
+            }
+
+            confirmClearHistoryMonth() {
+                const selectedMonth = document.getElementById('clear-history-select').value;
+                if (!selectedMonth) return;
+
+                this.showConfirm("Eliminar Periodo", `¿Estás seguro de eliminar todo el historial correspondiente a "${selectedMonth}"?`, () => {
+                    this.globalHistory = this.globalHistory.filter(m => this.extractMonthYearKey(m.date) !== selectedMonth);
+                    this.saveData();
+                    this.renderGlobalHistory();
+                    this.closeClearHistoryModal();
+                    this.notify("Historial actualizado", `Se han eliminado los registros del periodo ${selectedMonth}.`, "success");
+                });
+            }
+
+            previewCorteMensual() {
+                const now = new Date();
+                
+                const currentYear = now.getFullYear();
+                const currentMonth = now.getMonth();
+                const currentDay = now.getDate();
+                const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+                
+                const isAllowedDay = (currentDay === 15 || currentDay === lastDayOfMonth);
+
+                const ingresosCrudos = this.cajaIngresos.rawTotal;
+                const ingresosInteres = this.cajaIngresos.periodInterest;
+                const totalRepartir = this.cajaIngresos.balance;
+                
+                const opInteres = this.cajaOperativos.periodInterest;
+                const opRetiros = this.cajaOperativos.periodWithdrawals;
+                const opAsignacion = totalRepartir * 0.20;
+                const opBalanceActual = this.cajaOperativos.balance;
+                const opInicial = opBalanceActual - opInteres + opRetiros;
+                const opFinalNuevo = opBalanceActual + opAsignacion;
+
+                const reInteres = this.cajaReinversion.periodInterest;
+                const reRetiros = this.cajaReinversion.periodWithdrawals;
+                const reAsignacion = totalRepartir * 0.20;
+                const reBalanceActual = this.cajaReinversion.balance;
+                const reInicial = reBalanceActual - reInteres + reRetiros;
+                const reFinalNuevo = reBalanceActual + reAsignacion;
+
+                const asigIntegrantes = totalRepartir * 0.60;
+                const countIntegrantes = this.members.length;
+                const porIntegrante = countIntegrantes > 0 ? (asigIntegrantes / countIntegrantes) : 0;
+
+                const ultimoCorteTexto = this.lastCutTimestamp ? this.lastCutTimestamp : "Inicio de operaciones (Sin corte previo)";
+
+                this.pendingCut = {
+                    dateStr: now.toLocaleString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit' }),
+                    periodoStr: `Al día ${now.getDate()} de ${now.toLocaleString('es-MX', { month: 'long', year: 'numeric' })}`,
+                    ultimoCorteTexto,
+                    opAsignacion, reAsignacion, opFinalNuevo, reFinalNuevo,
+                    ingresosCrudos, ingresosInteres, totalRepartir,
+                    opInicial, opInteres, opRetiros,
+                    reInicial, reInteres, reRetiros,
+                    asigIntegrantes, countIntegrantes, porIntegrante,
+                    isAllowedDay,
+                    lastDayOfMonth
+                };
+
+                const f = (num) => `$${num.toLocaleString('es-MX', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                
+                let html = `
+                    <div class="border-b border-[#BDBDBD]/20 print-border pb-5 mb-6 print-section-block">
+                        <h2 class="text-3xl font-bold text-[#FCEED2] print-text">Reporte de Corte</h2>
+                        <p class="text-sm text-[#BDBDBD] print-text-muted mt-1">Generado: ${this.pendingCut.dateStr}</p>
+                        <p class="text-sm font-semibold text-[#FCEED2] print-text mt-1">Período: ${this.pendingCut.periodoStr}</p>
+                    </div>
+
+                    <!-- 1. Ingresos y Rendimiento -->
+                    <div class="mb-6 print-section-block">
+                        <h3 class="text-sm font-bold text-[#FCEED2] print-text-muted uppercase tracking-wider mb-3">1. Ingresos y Rendimiento (100%)</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                            <div class="bg-[#212121] print-card rounded-xl p-4 border border-[#BDBDBD]/20">
+                                <p class="text-xs text-[#BDBDBD] print-text-muted mb-1">Ingresos Crudos (Depósitos)</p>
+                                <p class="text-xl font-bold text-[#FCEED2] print-text">${f(ingresosCrudos)}</p>
+                            </div>
+                            <div class="bg-[#212121] print-card rounded-xl p-4 border border-[#BDBDBD]/20">
+                                <p class="text-xs text-[#BDBDBD] print-text-muted mb-1">Generado por 6.5% Anual</p>
+                                <p class="text-xl font-bold text-[#C4FF3A] print-text print-text-lime">+ ${f(ingresosInteres)}</p>
+                            </div>
+                            <div class="bg-[#212121] print-card rounded-xl p-4 border border-[#BDBDBD]/20">
+                                <p class="text-xs text-[#BDBDBD] print-text-muted mb-1">Total a Repartir</p>
+                                <p class="text-xl font-bold text-[#FCEED2] print-text">${f(totalRepartir)}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Cajas de Ahorro -->
+                    <div class="mb-6 print-section-block">
+                        <h3 class="text-sm font-bold text-[#FCEED2] print-text-muted uppercase tracking-wider mb-3">2. Distribución a Cajas de Ahorro</h3>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                            
+                            <!-- Caja Reinversión -->
+                            <div class="bg-[#212121] print-card rounded-xl border border-[#BDBDBD]/20 overflow-hidden">
+                                <div class="bg-[#212121] print-bg-alt px-5 py-3 border-b border-[#BDBDBD]/20 print-border flex items-center justify-between">
+                                    <span class="font-bold text-[#FCEED2] text-sm uppercase tracking-wide">Caja de Reinversión (20%)</span>
+                                    <span class="w-2.5 h-2.5 rounded-full bg-[#5B3CC4]"></span>
+                                </div>
+                                <div class="p-5 space-y-2.5 text-sm text-[#FCEED2] print-text">
+                                    <div class="flex justify-between flex-col sm:flex-row gap-1"><span class="text-[#BDBDBD] print-text-muted-override">Saldo al último corte:</span> <span class="font-medium text-right">${ultimoCorteTexto}</span></div>
+                                    <div class="flex justify-between font-semibold text-[#FCEED2] print-text pt-1"><span>Monto Base:</span> <span>${f(reInicial)}</span></div>
+                                    <div class="flex justify-between"><span>Rendimiento Generado (6.5%):</span> <span class="text-[#C4FF3A] print-text-lime">+ ${f(reInteres)}</span></div>
+                                    <div class="flex justify-between"><span>Retiros en el Periodo:</span> <span class="text-[#D83635] print-text-red">- ${f(reRetiros)}</span></div>
+                                    <div class="w-full h-px bg-[#BDBDBD]/20 print-border my-1.5"></div>
+                                    <div class="flex justify-between font-medium"><span>Asignación del Corte (+20%):</span> <span class="text-[#C4FF3A] print-text-lime">+ ${f(reAsignacion)}</span></div>
+                                    <div class="flex justify-between text-base font-bold text-[#FCEED2] print-text pt-2 border-t border-[#BDBDBD]/20 print-border"><span>Nuevo Saldo Total:</span> <span>${f(reFinalNuevo)}</span></div>
+                                </div>
+                            </div>
+
+                            <!-- Gastos Operativos -->
+                            <div class="bg-[#212121] print-card rounded-xl border border-[#BDBDBD]/20 overflow-hidden">
+                                <div class="bg-[#212121] print-bg-alt px-5 py-3 border-b border-[#BDBDBD]/20 print-border flex items-center justify-between">
+                                    <span class="font-bold text-[#FCEED2] text-sm uppercase tracking-wide">Gastos Operativos (20%)</span>
+                                    <span class="w-2.5 h-2.5 rounded-full bg-[#5B3CC4]"></span>
+                                </div>
+                                <div class="p-5 space-y-2.5 text-sm text-[#FCEED2] print-text">
+                                    <div class="flex justify-between flex-col sm:flex-row gap-1"><span class="text-[#BDBDBD] print-text-muted-override">Saldo al último corte:</span> <span class="font-medium text-right">${ultimoCorteTexto}</span></div>
+                                    <div class="flex justify-between font-semibold text-[#FCEED2] print-text pt-1"><span>Monto Base:</span> <span>${f(opInicial)}</span></div>
+                                    <div class="flex justify-between"><span>Rendimiento Generado (6.5%):</span> <span class="text-[#C4FF3A] print-text-lime">+ ${f(opInteres)}</span></div>
+                                    <div class="flex justify-between"><span>Retiros en el Periodo:</span> <span class="text-[#D83635] print-text-red">- ${f(opRetiros)}</span></div>
+                                    <div class="w-full h-px bg-[#BDBDBD]/20 print-border my-1.5"></div>
+                                    <div class="flex justify-between font-medium"><span>Asignación del Corte (+20%):</span> <span class="text-[#C4FF3A] print-text-lime">+ ${f(opAsignacion)}</span></div>
+                                    <div class="flex justify-between text-base font-bold text-[#FCEED2] print-text pt-2 border-t border-[#BDBDBD]/20 print-border"><span>Nuevo Saldo Total:</span> <span>${f(opFinalNuevo)}</span></div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- 3. Reparto a Integrantes -->
+                    <div class="mb-6 print-section-block">
+                        <div class="flex justify-between items-center mb-3">
+                            <h3 class="text-sm font-bold text-[#FCEED2] print-text-muted uppercase tracking-wider">3. Reparto a Integrantes (60%)</h3>
+                            <span class="text-base font-bold text-[#FCEED2] print-text bg-[#212121] print-card px-4 py-1.5 rounded-xl border border-[#BDBDBD]/20">Total a distribuir: ${f(asigIntegrantes)}</span>
+                        </div>
+                `;
+
+                if (countIntegrantes > 0) {
+                    html += `<div class="grid grid-cols-2 sm:grid-cols-3 gap-3">`;
+                    this.members.forEach(m => {
+                        html += `
+                            <div class="bg-[#212121] print-card border border-[#BDBDBD]/20 rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                                <span class="text-sm font-medium text-[#BDBDBD] print-text-muted mb-1">${m.name}</span>
+                                <span class="text-base font-bold text-[#FCEED2] print-text">${f(porIntegrante)}</span>
+                            </div>
+                        `;
+                    });
+                    html += `</div>`;
+                } else {
+                    html += `<div class="bg-[#212121] print-card border border-[#BDBDBD]/20 text-[#FCEED2] print-text p-4 rounded-xl text-sm italic text-center">No hay integrantes registrados. El 60% quedará pendiente.</div>`;
+                }
+                html += `</div>`;
+
+                // 4. Historial Detallado Secuencial
+                html += `<div class="mb-2"><h3 class="text-sm font-bold text-[#FCEED2] print-text-muted uppercase tracking-wider mb-3">4. Desglose Histórico y Secuencial del Periodo</h3></div>`;
+
+                let currentIngresosMovs = this.cajaIngresos.history;
+                let currentRetiroMovs = [
+                    ...this.cajaOperativos.history.filter(m => m.type === 'RETIRO'),
+                    ...this.cajaReinversion.history.filter(m => m.type === 'RETIRO')
+                ];
+
+                if (this.lastCutTimestamp) {
+                    const lastCutDate = this.parseDateEsMX(this.lastCutTimestamp);
+                    if (!isNaN(lastCutDate.getTime())) {
+                        currentIngresosMovs = this.cajaIngresos.history.filter(m => {
+                            const movDate = this.parseDateEsMX(m.date);
+                            return isNaN(movDate.getTime()) || movDate >= lastCutDate;
+                        });
+                        currentRetiroMovs = currentRetiroMovs.filter(m => {
+                            const movDate = this.parseDateEsMX(m.date);
+                            return isNaN(movDate.getTime()) || movDate >= lastCutDate;
+                        });
+                    }
+                }
+
+                // Sub-bloque A
+                html += `<div class="print-section-block border-l-2 border-[#5B3CC4] pl-4 py-2">`;
+                html += `<span class="font-bold text-[#FCEED2] print-text uppercase text-xs">A. Ingresos Totales</span>`;
+                if(currentIngresosMovs.length > 0) {
+                    html += `<p class="text-xs text-[#BDBDBD] print-text-muted mt-1 italic">Del total de ${f(ingresosCrudos)} de estos ingresos, a este corte se generó ${f(ingresosInteres)} para un total de ${f(totalRepartir)}.</p><div class="space-y-2 mt-2">`;
+                    currentIngresosMovs.forEach(m => html += this.renderMovItem(m, 'bg-[#5B3CC4]/20 text-[#C4FF3A] print-text-lime'));
+                    html += `</div>`;
+                } else {
+                    html += `<p class="text-xs text-[#BDBDBD] print-text-muted mt-1 italic">No se registraron nuevos ingresos en este periodo. Total actual a repartir: ${f(totalRepartir)}.</p>`;
+                }
+                html += `</div>`;
+
+                // Sub-bloque B
+                html += `<div class="print-section-block border-l-2 border-[#5B3CC4] pl-4 py-2">`;
+                html += `<span class="font-bold text-[#FCEED2] print-text uppercase text-xs">B. Rendimientos Generados (6.5% Anual en Todas las Cajas)</span>`;
+                html += `<div class="space-y-2 mt-2">
+                    <div class="flex justify-between items-center bg-[#212121] print-card p-3 rounded-xl border border-[#BDBDBD]/10">
+                        <div><span class="px-2.5 py-1 rounded text-xs font-bold uppercase bg-[#5B3CC4]/20 text-[#C4FF3A] print-text-lime">RENDIMIENTO 6.5%</span><span class="font-semibold text-[#FCEED2] print-text ml-2">Caja Ingresos</span></div>
+                        <span class="font-bold text-[#FCEED2] print-text text-base">${f(ingresosInteres)}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-[#212121] print-card p-3 rounded-xl border border-[#BDBDBD]/10">
+                        <div><span class="px-2.5 py-1 rounded text-xs font-bold uppercase bg-[#5B3CC4]/20 text-[#C4FF3A] print-text-lime">RENDIMIENTO 6.5%</span><span class="font-semibold text-[#FCEED2] print-text ml-2">Gastos Operativos</span></div>
+                        <span class="font-bold text-[#FCEED2] print-text text-base">${f(opInteres)}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-[#212121] print-card p-3 rounded-xl border border-[#BDBDBD]/10">
+                        <div><span class="px-2.5 py-1 rounded text-xs font-bold uppercase bg-[#5B3CC4]/20 text-[#C4FF3A] print-text-lime">RENDIMIENTO 6.5%</span><span class="font-semibold text-[#FCEED2] print-text ml-2">Reinversión</span></div>
+                        <span class="font-bold text-[#FCEED2] print-text text-base">${f(reInteres)}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-[#212121] print-card p-3 rounded-xl border border-[#BDBDBD]/10">
+                        <div><span class="px-2.5 py-1 rounded text-xs font-bold uppercase bg-[#5B3CC4]/20 text-[#C4FF3A] print-text-lime">RENDIMIENTO 6.5%</span><span class="font-semibold text-[#FCEED2] print-text ml-2">IVA</span></div>
+                        <span class="font-bold text-[#FCEED2] print-text text-base">${f(this.cajaIVA.periodInterest)}</span>
+                    </div>
+                </div></div>`;
+
+                // Sub-bloque C
+                html += `<div class="print-section-block border-l-2 border-[#D83635] pl-4 py-2">`;
+                html += `<span class="font-bold text-[#D83635] print-text-red uppercase text-xs">C. Egresos y Retiros del Periodo</span>`;
+                if(currentRetiroMovs.length > 0) {
+                    html += `<div class="space-y-2 mt-2">`;
+                    currentRetiroMovs.forEach(m => html += this.renderMovItem(m, 'bg-[#D83635]/20 text-[#D83635] print-text-red'));
+                    html += `</div>`;
+                } else {
+                    html += `<p class="text-xs text-[#BDBDBD] print-text-muted mt-1 italic">No hubo retiros en este periodo.</p>`;
+                }
+                html += `</div>`;
+
+                // Sub-bloque D
+                html += `<div class="print-section-block border-l-2 border-[#5B3CC4] pl-4 py-2">`;
+                html += `<span class="font-bold text-[#FCEED2] print-text uppercase text-xs">D. Asignación de Corte a Cajas (20% c/u)</span>`;
+                html += `<div class="space-y-2 mt-2">
+                    <div class="flex justify-between items-center bg-[#212121] print-card p-3 rounded-xl border border-[#BDBDBD]/10">
+                        <div><span class="px-2.5 py-1 rounded text-xs font-bold uppercase bg-[#5B3CC4]/30 text-[#FCEED2] print-text">CORTE 20%</span><span class="font-semibold text-[#FCEED2] print-text ml-2">Gastos Operativos</span></div>
+                        <span class="font-bold text-[#FCEED2] print-text text-base">${f(opAsignacion)}</span>
+                    </div>
+                    <div class="flex justify-between items-center bg-[#212121] print-card p-3 rounded-xl border border-[#BDBDBD]/10">
+                        <div><span class="px-2.5 py-1 rounded text-xs font-bold uppercase bg-[#5B3CC4]/30 text-[#FCEED2] print-text">CORTE 20%</span><span class="font-semibold text-[#FCEED2] print-text ml-2">Reinversión</span></div>
+                        <span class="font-bold text-[#FCEED2] print-text text-base">${f(reAsignacion)}</span>
+                    </div>
+                </div></div>`;
+
+                // Sub-bloque E
+                if(countIntegrantes > 0) {
+                    html += `<div class="print-section-block border-l-2 border-[#5B3CC4] pl-4 py-2">`;
+                    html += `<span class="font-bold text-[#FCEED2] print-text uppercase text-xs">E. Reparto Final a Integrantes (60% - Último Paso)</span><div class="space-y-2 mt-2">`;
+                    this.members.forEach(m => {
+                        html += `
+                            <div class="flex justify-between items-center bg-[#212121] print-card p-3 rounded-xl border border-[#BDBDBD]/10">
+                                <div><span class="px-2.5 py-1 rounded text-xs font-bold uppercase bg-[#5B3CC4]/20 text-[#C4FF3A] print-text-lime">REPARTO FINAL</span><span class="font-semibold text-[#FCEED2] print-text ml-2">${m.name}</span></div>
+                                <span class="font-bold text-[#FCEED2] print-text text-base">${f(porIntegrante)}</span>
+                            </div>
+                        `;
+                    });
+                    html += `</div></div>`;
+                }
+
+                const plainText = this.generatePlainText(this.pendingCut, currentIngresosMovs);
+                this.pendingCut.plainTextReport = plainText;
+
+                document.getElementById('report-content').innerHTML = html;
+                document.getElementById('report-success-banner').classList.add('hidden');
+                document.getElementById('report-actions-preview').classList.remove('hidden');
+                document.getElementById('report-actions-done').classList.add('hidden');
+
+                const restrictionMsg = document.getElementById('report-restriction-msg');
+                const applyBtn = document.getElementById('apply-cut-btn');
+
+                if (isAllowedDay) {
+                    restrictionMsg.innerHTML = `<span class="text-[#C4FF3A] flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>Hoy es día 15 o último día del mes (${lastDayOfMonth}). El corte está habilitado.</span>`;
+                    applyBtn.disabled = false;
+                    applyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                } else {
+                    restrictionMsg.innerHTML = `<span class="text-[#D83635] flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>El corte solo se puede aplicar el día 15 o el último día del mes (Día ${lastDayOfMonth}).</span>`;
+                    applyBtn.disabled = true;
+                    applyBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
+                
+                document.getElementById('report-modal').classList.remove('hidden');
+                document.getElementById('report-modal').classList.add('flex');
+            }
+
+            renderMovItem(m, badgeStyle) {
+                return `
+                    <div class="flex justify-between items-center bg-[#212121] print-card p-3 rounded-xl border border-[#BDBDBD]/10">
+                        <div>
+                            <div class="flex items-center gap-2.5">
+                                <span class="px-2.5 py-1 rounded text-xs font-bold uppercase ${badgeStyle}">${m.type}</span>
+                                <span class="font-semibold text-[#FCEED2] print-text text-sm">${m.reason || m.box}</span>
+                                <span class="text-xs text-[#BDBDBD] print-text-muted">(${m.box})</span>
+                            </div>
+                            ${m.description ? `<p class="text-[#BDBDBD] print-text-muted text-xs mt-1 ml-1">Nota: ${m.description}</p>` : ''}
+                            <span class="text-xs text-[#BDBDBD]/60 print-text-muted block mt-1 ml-1">${m.date}</span>
+                        </div>
+                        <span class="font-bold text-[#FCEED2] print-text text-base">$${Number(m.amount || 0).toFixed(2)}</span>
+                    </div>
+                `;
+            }
+
+            cancelCorteMensual() {
+                this.pendingCut = null;
+                document.getElementById('report-modal').classList.remove('flex');
+                document.getElementById('report-modal').classList.add('hidden');
+            }
+
+            applyCorteMensual() {
+                if (!this.pendingCut || !this.pendingCut.isAllowedDay) return;
+
+                const savedPlainText = this.pendingCut.plainTextReport;
+                const logDateStr = new Date().toLocaleString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit', second:'2-digit' });
+                this.lastCutTimestamp = logDateStr;
+
+                const cutLogOp = { type: 'CORTE', amount: this.pendingCut.opAsignacion, reason: 'Asignación Corte (+20%)', date: logDateStr, box: 'Gastos Operativos' };
+                const cutLogRe = { type: 'CORTE', amount: this.pendingCut.reAsignacion, reason: 'Asignación Corte (+20%)', date: logDateStr, box: 'Reinversión' };
+
+                this.cajaReinversion.balance = this.pendingCut.reFinalNuevo;
+                this.cajaOperativos.balance = this.pendingCut.opFinalNuevo;
+
+                this.cajaReinversion.history.push(cutLogRe);
+                this.cajaOperativos.history.push(cutLogOp);
+                this.globalHistory.unshift(cutLogRe);
+                this.globalHistory.unshift(cutLogOp);
+
+                if (this.members.length > 0 && this.pendingCut.porIntegrante > 0) {
+                    this.members.forEach(m => {
+                        const memberLog = { type: 'REPARTO_60%', amount: this.pendingCut.porIntegrante, reason: `Reparto Final a Integrante (${m.name})`, date: logDateStr, box: 'Fondo Integrantes' };
+                        this.globalHistory.unshift(memberLog);
+                    });
+                }
+
+                // ==========================================
+                // REINICIAR RENDIMIENTOS Y CONTADORES A 0 EN CADA CORTE
+                // ==========================================
+                this.cajaIngresos.periodInterest = 0;
+                this.cajaIngresos.rawTotal = 0;
+                this.cajaIngresos.history = [];
+                this.cajaIngresos.balance = 0;
+
+                this.cajaOperativos.history = [];
+                this.cajaOperativos.periodInterest = 0;
+                this.cajaOperativos.periodWithdrawals = 0;
+
+                this.cajaReinversion.history = [];
+                this.cajaReinversion.periodInterest = 0;
+                this.cajaReinversion.periodWithdrawals = 0;
+
+                this.cajaIVA.periodInterest = 0;
+                this.cajaIVA.periodWithdrawals = 0;
+
+                this.saveData();
+                this.renderBoxes();
+                this.renderGlobalHistory();
+
+                document.getElementById('report-success-banner').classList.remove('hidden');
+                document.getElementById('report-success-banner').classList.add('flex');
+                document.getElementById('report-actions-preview').classList.add('hidden');
+                document.getElementById('report-actions-done').classList.remove('hidden');
+                document.getElementById('report-actions-done').classList.add('flex');
+                
+                this.pendingCut = { plainTextReport: savedPlainText };
+            }
+
+            closeReportModal() {
+                document.getElementById('report-modal').classList.remove('flex');
+                document.getElementById('report-modal').classList.add('hidden');
+                this.pendingCut = null;
+            }
+
+            generatePlainText(data, movements) {
+                const f = (num) => `$${num.toFixed(2)}`;
+                let txt = `=======================================\n`;
+                txt += `REPORTE DE CORTE\n`;
+                txt += `Fecha y Hora: ${data.dateStr}\n`;
+                txt += `Período: ${data.periodoStr}\n`;
+                txt += `=======================================\n\n`;
+                txt += `1. INGRESOS Y RENDIMIENTO (100%)\n`;
+                txt += `- Ingresos Crudos: ${f(data.ingresosCrudos)}\n`;
+                txt += `- Rendimiento 6.5%: +${f(data.ingresosInteres)}\n`;
+                txt += `> Total a Repartir: ${f(data.totalRepartir)}\n\n`;
+                txt += `2. CAJA DE REINVERSIÓN (20%)\n`;
+                txt += `- Saldo al último corte: ${data.ultimoCorteTexto}\n`;
+                txt += `- Rendimiento 6.5%: +${f(data.reInteres)}\n`;
+                txt += `- Retiros: -${f(data.reRetiros)}\n`;
+                txt += `- Asignación: +${f(data.reAsignacion)}\n`;
+                txt += `> Nuevo Saldo Total: ${f(data.reFinalNuevo)}\n\n`;
+                txt += `3. CAJA DE GASTOS OPERATIVOS (20%)\n`;
+                txt += `- Saldo al último corte: ${data.ultimoCorteTexto}\n`;
+                txt += `- Rendimiento 6.5%: +${f(data.opInteres)}\n`;
+                txt += `- Retiros: -${f(data.opRetiros)}\n`;
+                txt += `- Asignación: +${f(data.opAsignacion)}\n`;
+                txt += `> Nuevo Saldo Total: ${f(data.opFinalNuevo)}\n\n`;
+                txt += `4. CAJA IVA (Independiente)\n`;
+                txt += `- Rendimiento 6.5% generado: +${f(this.cajaIVA.periodInterest)}\n`;
+                txt += `> Saldo IVA: ${f(this.cajaIVA.balance)}\n\n`;
+                txt += `5. REPARTO A INTEGRANTES (60%)\n`;
+                txt += `> Monto Total Repartido: ${f(data.asigIntegrantes)}\n`;
+                if(this.members.length > 0) {
+                    this.members.forEach(m => txt += `  • ${m.name}: ${f(data.porIntegrante)}\n`);
+                }
+                txt += `\n6. HISTORIAL DE MOVIMIENTOS\n`;
+                movements.forEach(m => {
+                    txt += `[${m.date}] [${m.type}] ${m.reason || m.box} (${m.box}): $${m.amount.toFixed(2)} ${m.description ? '- '+m.description : ''}\n`;
+                });
+                return txt;
+            }
+
+            shareReport() {
+                const text = this.pendingCut && this.pendingCut.plainTextReport ? this.pendingCut.plainTextReport : document.getElementById('report-content').innerText;
+                if (navigator.share && navigator.canShare) {
+                    navigator.share({ title: 'Resumen de Corte', text: text }).catch(() => this.copiarPortapapeles(text));
+                } else {
+                    this.copiarPortapapeles(text);
+                }
+            }
+
+            copiarPortapapeles(text) {
+                navigator.clipboard.writeText(text).then(() => {
+                    this.notify("Copiado al portapapeles", "El resumen ha sido copiado con éxito.", "success");
+                }).catch(() => {
+                    this.notify("Error", "No se pudo copiar automáticamente.");
+                });
+            }
+        }
+
+        const app = new TabuladorFinancieroApp();
+    </script>
+</body>
+</html>
