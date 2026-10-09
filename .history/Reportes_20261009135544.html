@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reporte de Redes Sociales</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+        
+        /* Sección de controles (Subir y Guardar) */
+        .controls-section { text-align: center; margin-bottom: 30px; padding: 30px 20px; border: 2px dashed #bbb; border-radius: 10px; background-color: #fafafa; }
+        input[type="file"] { display: none; }
+        .custom-file-upload { display: inline-block; padding: 12px 24px; cursor: pointer; background-color: #3D5A80; color: white; border-radius: 5px; font-weight: bold; transition: 0.3s; margin-bottom: 10px; }
+        .custom-file-upload:hover { background-color: #2b405b; }
+        
+        /* Botón de Imprimir/PDF */
+        .btn-pdf { display: none; margin: 10px auto; padding: 12px 24px; background-color: #E07A5F; color: white; border: none; border-radius: 5px; font-weight: bold; font-size: 16px; cursor: pointer; transition: 0.3s; }
+        .btn-pdf:hover { background-color: #c9654d; }
+
+        .dashboard-layout { display: flex; gap: 30px; margin-top: 20px; flex-wrap: wrap; }
+        .column { flex: 1; min-width: 300px; display: flex; flex-direction: column; gap: 30px; }
+        .column-full { width: 100%; display: flex; flex-direction: column; gap: 30px; margin-top: 20px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        
+        .column-title { text-align: center; font-size: 1.5em; font-weight: bold; padding-bottom: 10px; border-bottom: 3px solid #eee; margin-bottom: 10px; }
+        
+        .chart-wrapper { background: #fff; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 3px 6px rgba(0,0,0,0.05); overflow: hidden; }
+        .chart-container { padding: 15px 15px 5px 15px; background: #fff; }
+        canvas { max-width: 100%; height: 350px !important; }
+        
+        .metrics-table { width: 100%; border-collapse: collapse; font-size: 0.85em; border-top: 2px solid #eee; }
+        .metrics-table th, .metrics-table td { padding: 8px 10px; text-align: center; border: 1px solid #eee; }
+        .metrics-table th { background: #fdfdfd; color: #555; font-weight: 600; }
+        .metrics-table td:first-child { text-align: left; background: #fdfdfd; font-weight: bold; color: #333; white-space: nowrap; }
+        
+        .text-table-wrapper { padding: 20px; }
+        .text-table { width: 100%; border-collapse: collapse; font-size: 0.9em; text-align: center; }
+        .text-table th, .text-table td { padding: 12px; border: 1px solid #ddd; }
+        .text-table th { background-color: #f4f7f6; color: #333; }
+        .text-table td:first-child { font-weight: bold; text-align: left; background-color: #fdfdfd; width: 150px; }
+        
+        .color-box { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 8px; vertical-align: middle; }
+
+        .fb-title { color: #1877F2; border-bottom-color: #1877F2; }
+        .ig-title { color: #E1306C; border-bottom-color: #E1306C; }
+        .aud-title { color: #8B75D7; border-bottom-color: #8B75D7; }
+
+        @media (max-width: 900px) { .dashboard-layout { flex-direction: column; } .grid-2 { grid-template-columns: 1fr; } }
+
+        /* ====================================================
+           REGLAS DE IMPRESIÓN (MAGIA PARA EL PDF DEL CLIENTE) 
+           ==================================================== */
+        @media print {
+            body { background-color: white !important; margin: 0; padding: 0; }
+            .container { box-shadow: none !important; padding: 0 !important; width: 100% !important; max-width: none !important; }
+            
+            /* OCULTAMOS LOS CONTROLES Y EL SUBTÍTULO */
+            .controls-section, .subtitle { display: none !important; }
+            
+            /* FORZAR LOS COLORES DE FONDO EN EL PDF (para que las tablas no salgan en blanco y negro) */
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+            
+            /* EVITAR QUE LAS GRÁFICAS SE CORTEN A LA MITAD ENTRE DOS PÁGINAS */
+            .chart-wrapper { page-break-inside: avoid; break-inside: avoid; border: 1px solid #ddd; margin-bottom: 20px; }
+            
+            h1 { margin-top: 0; font-size: 24px; }
+            
+            /* Si quieres asegurarte de que las columnas quepan bien en formato horizontal (Landscape) */
+            @page { size: landscape; margin: 1cm; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📊 Reporte de Rendimiento de Redes Sociales</h1>
+    <p class="subtitle">Sube tu archivo de Excel para actualizar las gráficas y tablas automáticamente</p>
+    
+    <!-- SECCIÓN DE CONTROLES (Esta sección desaparecerá en el PDF) -->
+    <div class="controls-section">
+        <label for="excel-upload" class="custom-file-upload">
+            📁 Cargar Archivo Excel (.xlsx)
+        </label>
+        <input id="excel-upload" type="file" accept=".xlsx, .xls" />
+        
+        <div id="file-name" style="margin-top: 10px; color: #444; font-weight: bold;"></div>
+        
+        <!-- EL NUEVO BOTÓN PARA GUARDAR PDF -->
+        <button id="btn-pdf" class="btn-pdf" onclick="window.print()">
+            🖨️ Guardar Reporte como PDF
+        </button>
+    </div>
+
+    <!-- Contenedor Principal de Gráficas -->
+    <div id="dashboard-layout" style="display: none;">
+        <div class="dashboard-layout">
+            <div class="column" id="col-fb">
+                <div class="column-title fb-title">📘 FACEBOOK</div>
+            </div>
+            <div class="column" id="col-ig">
+                <div class="column-title ig-title">📸 INSTAGRAM</div>
+            </div>
+        </div>
+        
+        <div class="column-full" id="col-aud">
+            <div class="column-title aud-title">👥 PÚBLICOS GENERALES</div>
+            <div class="grid-2" id="aud-grid"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    Chart.register(ChartDataLabels);
+
+    document.getElementById('excel-upload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        document.getElementById('file-name').textContent = "Procesando: " + file.name + "...";
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+            
+            procesarDatosYCrearGraficos(jsonData);
+            
+            // Confirmación y mostrado del botón PDF
+            document.getElementById('file-name').textContent = "✅ Listo. Ahora puedes descargar el reporte.";
+            document.getElementById('dashboard-layout').style.display = "block"; 
+            document.getElementById('btn-pdf').style.display = "inline-block"; // Mostrar botón PDF
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    function encontrarFila(data, textoBuscado, columna = null) {
+        for(let i = 0; i < data.length; i++) {
+            if (!data[i]) continue;
+            if (columna === null) {
+                for (let j = 0; j < data[i].length; j++) {
+                    if (String(data[i][j] || '').toLowerCase().includes(textoBuscado.toLowerCase())) {
+                        return { fila: i, col: j };
+                    }
+                }
+            } else {
+                if (String(data[i][columna] || '').toLowerCase().includes(textoBuscado.toLowerCase())) {
+                    return { fila: i, col: columna };
+                }
+            }
+        }
+        return null; 
+    }
+
+    function calcularPorcentajesPorSemana(datasets) {
+        const numSemanas = datasets[0].data.length;
+        for (let s = 0; s < numSemanas; s++) {
+            let totalSemana = 0;
+            for (let d = 0; d < datasets.length; d++) {
+                totalSemana += (parseFloat(datasets[d].data[s]) || 0);
+            }
+            if (totalSemana > 0) {
+                let factor = (totalSemana > 0.95 && totalSemana <= 1.05) ? 100 : (100 / totalSemana);
+                for (let d = 0; d < datasets.length; d++) {
+                    let val = parseFloat(datasets[d].data[s]) || 0;
+                    datasets[d].data[s] = parseFloat((val * factor).toFixed(1)); 
+                }
+            }
+        }
+        return datasets;
+    }
+
+    function extraerFila(data, numFila, inicioCol, finCol) {
+        let result = [];
+        let fila = data[numFila];
+        if (!fila) return new Array(finCol - inicioCol).fill(0);
+        for(let i = inicioCol; i < finCol; i++){
+            let valor = parseFloat(fila[i]);
+            result.push(isNaN(valor) ? 0 : valor);
+        }
+        return result;
+    }
+
+    function extraerFilaTexto(data, numFila, inicioCol, finCol) {
+        let result = [];
+        let fila = data[numFila];
+        if (!fila) return new Array(finCol - inicioCol).fill("-");
+        for(let i = inicioCol; i < finCol; i++){
+            result.push(fila[i] ? String(fila[i]).trim() : "-");
+        }
+        return result;
+    }
+
+    function procesarDatosYCrearGraficos(data) {
+        const colFb = document.getElementById('col-fb');
+        const colIg = document.getElementById('col-ig');
+        const audGrid = document.getElementById('aud-grid');
+        
+        colFb.querySelectorAll('.chart-wrapper').forEach(el => el.remove());
+        colIg.querySelectorAll('.chart-wrapper').forEach(el => el.remove());
+        audGrid.innerHTML = '';
+
+        const posFb = encontrarFila(data, 'facebook', 0);
+        const posIg = encontrarFila(data, 'instagram', 8);
+        
+        const idxSemanasFb = posFb ? posFb.fila : 1;
+        const idxSemanasIg = posIg ? posIg.fila : 1;
+        
+        const semanasFb = data[idxSemanasFb] ? data[idxSemanasFb].slice(1, 7).map(s => s ? String(s).trim() : 'Semana') : ['S1','S2','S3','S4','S5','S6'];
+        const semanasIg = data[idxSemanasIg] ? data[idxSemanasIg].slice(9, 15).map(s => s ? String(s).trim() : 'Semana') : ['S1','S2','S3','S4','S5','S6'];
+
+        // ==================== FACEBOOK ====================
+        if (posFb) {
+            crearGraficoYTabla(colFb, 'Visión General (Métricas Base)', {
+                labels: semanasFb,
+                datasets: [
+                    { label: 'Visualizaciones', data: extraerFila(data, posFb.fila + 1, 1, 7), backgroundColor: '#8B75D7' },
+                    { label: 'Espectadores', data: extraerFila(data, posFb.fila + 2, 1, 7), backgroundColor: '#E07A5F' },
+                    { label: 'Interacción', data: extraerFila(data, posFb.fila + 3, 1, 7), backgroundColor: '#3D5A80' },
+                    { label: 'Visitas al perfil', data: extraerFila(data, posFb.fila + 4, 1, 7), backgroundColor: '#F4A261' }
+                ]
+            }, false);
+
+            let posContFb = encontrarFila(data, 'visualizaciones por contenido', 0);
+            if(posContFb) {
+                let fbContenidoDatasets = [
+                    { label: 'Fotos', data: extraerFila(data, posContFb.fila + 1, 1, 7), backgroundColor: '#6A4C93' },
+                    { label: 'Carruseles', data: extraerFila(data, posContFb.fila + 2, 1, 7), backgroundColor: '#1982C4' },
+                    { label: 'Videos', data: extraerFila(data, posContFb.fila + 3, 1, 7), backgroundColor: '#8AC926' },
+                    { label: 'Enlace', data: extraerFila(data, posContFb.fila + 4, 1, 7), backgroundColor: '#FFCA3A' }
+                ];
+                crearGraficoYTabla(colFb, 'Por Tipo de Contenido (%)', { labels: semanasFb, datasets: calcularPorcentajesPorSemana(fbContenidoDatasets) }, true);
+            }
+
+            let posOrigenFb = encontrarFila(data, 'encuentran', 0);
+            if(posOrigenFb) {
+                let fbOrigenDatasets = [
+                    { label: 'Reels', data: extraerFila(data, posOrigenFb.fila + 1, 1, 7), backgroundColor: '#FF595E' },
+                    { label: 'Tu página', data: extraerFila(data, posOrigenFb.fila + 2, 1, 7), backgroundColor: '#FFCA3A' },
+                    { label: 'Feed', data: extraerFila(data, posOrigenFb.fila + 3, 1, 7), backgroundColor: '#8AC926' },
+                    { label: 'No disponible', data: extraerFila(data, posOrigenFb.fila + 4, 1, 7), backgroundColor: '#1982C4' }
+                ];
+                crearGraficoYTabla(colFb, 'Cómo encuentran tu contenido (%)', { labels: semanasFb, datasets: calcularPorcentajesPorSemana(fbOrigenDatasets) }, true);
+            }
+            
+            let posNoSeguidores = encontrarFila(data, 'no seguidores', 0);
+            if(posNoSeguidores) {
+                let fbPublicosDatasets = [
+                    { label: 'No seguidores', data: extraerFila(data, posNoSeguidores.fila, 1, 7), backgroundColor: '#6A4C93' },
+                    { label: 'Seguidores', data: extraerFila(data, posNoSeguidores.fila + 1, 1, 7), backgroundColor: '#F4A261' }
+                ];
+                crearGraficoYTabla(colFb, 'Alcance Público (%)', { labels: semanasFb, datasets: calcularPorcentajesPorSemana(fbPublicosDatasets) }, true);
+            }
+        }
+
+        // ==================== INSTAGRAM ====================
+        if (posIg) {
+            crearGraficoYTabla(colIg, 'Visión General (Métricas Base)', {
+                labels: semanasIg,
+                datasets: [
+                    { label: 'Visualizaciones', data: extraerFila(data, posIg.fila + 1, posIg.col + 1, posIg.col + 7), backgroundColor: '#8B75D7' },
+                    { label: 'Alcance', data: extraerFila(data, posIg.fila + 2, posIg.col + 1, posIg.col + 7), backgroundColor: '#E07A5F' },
+                    { label: 'Interacción', data: extraerFila(data, posIg.fila + 3, posIg.col + 1, posIg.col + 7), backgroundColor: '#3D5A80' },
+                    { label: 'Visitas al perfil', data: extraerFila(data, posIg.fila + 4, posIg.col + 1, posIg.col + 7), backgroundColor: '#F4A261' }
+                ]
+            }, false);
+
+            let posContIg = encontrarFila(data, 'visualizaciones por contenido', posIg.col);
+            if(posContIg) {
+                let igContenidoDatasets = [
+                    { label: 'Publicaciones', data: extraerFila(data, posContIg.fila + 1, posIg.col + 1, posIg.col + 7), backgroundColor: '#6A4C93' },
+                    { label: 'Reels', data: extraerFila(data, posContIg.fila + 2, posIg.col + 1, posIg.col + 7), backgroundColor: '#FF595E' },
+                    { label: 'Historias', data: extraerFila(data, posContIg.fila + 3, posIg.col + 1, posIg.col + 7), backgroundColor: '#FFCA3A' }
+                ];
+                crearGraficoYTabla(colIg, 'Por Tipo de Contenido (%)', { labels: semanasIg, datasets: calcularPorcentajesPorSemana(igContenidoDatasets) }, true);
+            }
+        }
+
+        // ==================== PÚBLICOS GENERALES ====================
+        const posAud = encontrarFila(data, 'publicos'); 
+        if (posAud) {
+            const baseCol = posAud.col; 
+            const semanasAud = data[posAud.fila] ? data[posAud.fila].slice(baseCol + 1, baseCol + 7).map(s => s ? String(s).trim() : 'Sem') : semanasFb;
+            
+            let audDatasets = [
+                { label: 'Mujeres', data: extraerFila(data, posAud.fila + 1, baseCol + 1, baseCol + 7), backgroundColor: '#E1306C' },
+                { label: 'Hombres', data: extraerFila(data, posAud.fila + 2, baseCol + 1, baseCol + 7), backgroundColor: '#1877F2' } 
+            ];
+            crearGraficoYTabla(audGrid, 'Distribución de Género (%)', { labels: semanasAud, datasets: calcularPorcentajesPorSemana(audDatasets) }, true);
+        }
+
+        const posUbi = encontrarFila(data, 'publico pontencial');
+        if (posUbi) {
+            const ubiCol = posUbi.col;
+            const semanasUbi = data[posUbi.fila] ? data[posUbi.fila].slice(ubiCol + 1, ubiCol + 7).map(s => s ? String(s).trim() : 'Sem') : semanasFb;
+            
+            let ubiDatasets = [];
+            let coloresUbi = ['#FF595E', '#FFCA3A', '#8AC926', '#1982C4', '#6A4C93'];
+            for(let i = 0; i < 5; i++) {
+                let nombreCiudad = data[posUbi.fila + 2 + i] ? (data[posUbi.fila + 2 + i][ubiCol] || `Ciudad ${i+1}`) : `Ciudad ${i+1}`;
+                ubiDatasets.push({
+                    label: nombreCiudad,
+                    data: extraerFila(data, posUbi.fila + 2 + i, ubiCol + 1, ubiCol + 7),
+                    backgroundColor: coloresUbi[i]
+                });
+            }
+            crearGraficoYTabla(audGrid, 'Top 5 Ciudades (%)', { labels: semanasUbi, datasets: calcularPorcentajesPorSemana(ubiDatasets) }, true);
+        }
+        
+        const posEdades = encontrarFila(data, 'publico alcanzado');
+        if (posEdades) {
+            const edCol = posEdades.col;
+            const semanasEd = data[posAud ? posAud.fila : posEdades.fila] ? data[posAud ? posAud.fila : posEdades.fila].slice(edCol + 1, edCol + 7).map(s => s ? String(s).trim() : 'Sem') : semanasFb;
+            
+            let filasTextos = [
+                { titulo: '18 - 24 años', datos: extraerFilaTexto(data, posEdades.fila + 1, edCol + 1, edCol + 7) },
+                { titulo: '25 - 34 años', datos: extraerFilaTexto(data, posEdades.fila + 2, edCol + 1, edCol + 7) },
+                { titulo: '35 - 44 años', datos: extraerFilaTexto(data, posEdades.fila + 3, edCol + 1, edCol + 7) },
+                { titulo: '45 - 54 años', datos: extraerFilaTexto(data, posEdades.fila + 4, edCol + 1, edCol + 7) },
+                { titulo: '55 - 64 años', datos: extraerFilaTexto(data, posEdades.fila + 5, edCol + 1, edCol + 7) }
+            ];
+            crearTablaTexto(audGrid, 'Rango de Edades Dominante', semanasEd, filasTextos);
+        }
+    }
+
+    function crearTablaTexto(container, titulo, etiquetas, filas) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'chart-wrapper text-table-wrapper';
+        wrapper.style.gridColumn = '1 / -1'; 
+        
+        const titleDiv = document.createElement('div');
+        titleDiv.style.textAlign = 'center';
+        titleDiv.style.fontSize = '16px';
+        titleDiv.style.fontWeight = 'bold';
+        titleDiv.style.color = '#666';
+        titleDiv.style.marginBottom = '15px';
+        titleDiv.innerText = titulo;
+        wrapper.appendChild(titleDiv);
+
+        const table = document.createElement('table');
+        table.className = 'text-table';
+        
+        let thead = '<tr><th>Rango de Edad</th>';
+        etiquetas.forEach(l => { thead += `<th>${l.replace('Semana', 'Sem')}</th>`; });
+        thead += '</tr>';
+        table.innerHTML = `<thead>${thead}</thead>`;
+
+        let tbody = document.createElement('tbody');
+        filas.forEach(f => {
+            let tr = document.createElement('tr');
+            tr.innerHTML = `<td>${f.titulo}</td>`;
+            f.datos.forEach(val => {
+                let colorVal = val;
+                if(val.toLowerCase() === 'mayor') colorVal = '<span style="color: #4CAF50; font-weight:bold;">Mayor</span>';
+                if(val.toLowerCase() === 'media') colorVal = '<span style="color: #FF9800; font-weight:bold;">Media</span>';
+                if(val.toLowerCase() === 'minoria') colorVal = '<span style="color: #F44336; font-weight:bold;">Minoria</span>';
+                tr.innerHTML += `<td>${colorVal}</td>`;
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+        container.appendChild(wrapper);
+    }
+
+    function crearGraficoYTabla(container, titulo, chartData, esPorcentual) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'chart-wrapper';
+
+        const div = document.createElement('div');
+        div.className = 'chart-container';
+        const canvas = document.createElement('canvas');
+        div.appendChild(canvas);
+        wrapper.appendChild(div);
+
+        const table = document.createElement('table');
+        table.className = 'metrics-table';
+        
+        let thead = '<tr><th>Métrica</th>';
+        chartData.labels.forEach(l => { thead += `<th>${l.replace('Semana', 'Sem')}</th>`; });
+        thead += '</tr>';
+        table.innerHTML = `<thead>${thead}</thead>`;
+
+        let tbody = document.createElement('tbody');
+        chartData.datasets.forEach(ds => {
+            let tr = document.createElement('tr');
+            tr.innerHTML = `<td><span class="color-box" style="background-color:${ds.backgroundColor}"></span> ${ds.label}</td>`;
+            ds.data.forEach(val => {
+                let printVal = esPorcentual ? val + '%' : Number(val).toLocaleString('es-MX');
+                tr.innerHTML += `<td>${printVal}</td>`;
+            });
+            tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+
+        container.appendChild(wrapper);
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: titulo, font: { size: 16 } },
+                    datalabels: {
+                        display: function(context) {
+                            let val = context.dataset.data[context.dataIndex];
+                            if (!val || val === 0) return false;
+                            
+                            if (esPorcentual) return val > 5; 
+                            
+                            let maxTotalChart = 0;
+                            let numSemanas = context.chart.data.labels.length;
+                            for (let i = 0; i < numSemanas; i++) {
+                                let sumSemana = context.chart.data.datasets.reduce((acc, curr) => acc + (Number(curr.data[i]) || 0), 0);
+                                if (sumSemana > maxTotalChart) maxTotalChart = sumSemana;
+                            }
+                            return (val / maxTotalChart) > 0.05; 
+                        },
+                        color: 'white',
+                        font: { weight: 'bold', size: 11 },
+                        formatter: function(value) {
+                            return esPorcentual ? Math.round(value) + '%' : Number(value).toLocaleString('es-MX');
+                        }
+                    }
+                },
+                scales: {
+                    x: { stacked: true },
+                    y: { 
+                        stacked: true, 
+                        max: esPorcentual ? 100 : undefined,
+                        grid: { drawBorder: false },
+                        ticks: {
+                            display: esPorcentual, 
+                            callback: function(value) { return value + (esPorcentual ? '%' : ''); }
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portafolio de Proyectos - RivianWolf34</title>
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: #161b22;
+            --text-color: #c9d1d9;
+            --accent-color: #58a6ff;
+            --border-color: #30363d;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 40px 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 800px;
+            width: 100%;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+        }
+        h1 {
+            color: #f0f6fc;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #8b949e;
+            font-size: 1.1rem;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        @media (max-width: 600px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        .card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 24px;
+            text-decoration: none;
+            color: var(--text-color);
+            transition: transform 0.2s, border-color 0.2s;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent-color);
+        }
+        .card h3 {
+            color: var(--accent-color);
+            margin-top: 0;
+            margin-bottom: 10px;
+        }
+        .card p {
+            font-size: 0.95rem;
+            color: #8b949e;
+            margin-bottom: 15px;
+            line-height: 1.4;
+        }
+        .badge {
+            align-self: flex-start;
+            background-color: #21262d;
+            color: #f0f6fc;
+            padding: 4px 8px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            border: 1px solid var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Mis Herramientas y Tabuladores</h1>
+        <p class="subtitle">Proyectos funcionales desarrollados con optimización de Inteligencia Artificial</p>
+    </header>
+
+    <div class="grid">
+        <!-- Tarjeta 1 -->
+        <a href="Tabulador_Ingresos_Egresos_Sabotage.html" class="card">
+            <div>
+                <h3>📊 Tabulador de Ingresos y Egresos</h3>
+                <p>Herramienta financiera interactiva para el control y balance de presupuestos operativos.</p>
+            </div>
+            <span class="badge">HTML / JS</span>
+        </a>
+
+        <!-- Tarjeta 2 -->
+        <a href="cotizador_de_producto_y_servicio.html" class="card">
+            <div>
+                <h3>💰 Cotizador de Productos y Servicios</h3>
+                <p>Aplicación de cálculo dinámico para generar presupuestos comerciales inmediatos.</p>
+            </div>
+            <span class="badge">HTML / JS</span>
+        </a>
+
+        <!-- Tarjeta 3 -->
+        <a href="hoja_de_llamado.html" class="card">
+            <div>
+                <h3>📋 Hoja de Llamado</h3>
+                <p>Formulario y organizador de logística estructurado para coordinación de actividades.</p>
+            </div>
+            <span class="badge">HTML / CSS</span>
+        </a>
+
+        <!-- Tarjeta 4 -->
+        <a href="Imagen_Base64.html" class="card">
+            <div>
+                <h3>🖼️ Convertidor Imagen a Base64</h3>
+                <p>Utilidad técnica para codificar archivos de imagen en cadenas de texto Base64 legibles.</p>
+            </div>
+            <span class="badge">HTML / Herramienta</span>
+        </a>
+    </div>
+</div>
+
+</body>
+</html>

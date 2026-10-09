@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Reportes</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+        .upload-section { text-align: center; margin-bottom: 30px; padding: 40px 20px; border: 2px dashed #bbb; border-radius: 10px; background-color: #fafafa; }
+        input[type="file"] { display: none; }
+        .custom-file-upload { display: inline-block; padding: 12px 24px; cursor: pointer; background-color: #3D5A80; color: white; border-radius: 5px; font-weight: bold; transition: 0.3s; }
+        .custom-file-upload:hover { background-color: #2b405b; }
+        
+        .dashboard-layout { display: flex; gap: 30px; margin-top: 20px; }
+        .column { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+        .column-title { text-align: center; font-size: 1.5em; font-weight: bold; padding-bottom: 10px; border-bottom: 3px solid #eee; margin-bottom: 10px; }
+        
+        .chart-container { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        canvas { max-width: 100%; height: 350px !important; }
+        
+        .fb-title { color: #1877F2; border-bottom-color: #1877F2; }
+        .ig-title { color: #E1306C; border-bottom-color: #E1306C; }
+
+        @media (max-width: 900px) { .dashboard-layout { flex-direction: column; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📊 Dashboard de Redes Sociales</h1>
+    <p class="subtitle">Sube tu archivo de Excel para actualizar las gráficas automáticamente</p>
+    
+    <div class="upload-section">
+        <label for="excel-upload" class="custom-file-upload">
+            📁 Seleccionar Archivo Excel (.xlsx)
+        </label>
+        <input id="excel-upload" type="file" accept=".xlsx, .xls" />
+        <p id="file-name" style="margin-top: 15px; color: #444; font-weight: bold;"></p>
+    </div>
+
+    <div class="dashboard-layout" id="dashboard-layout" style="display: none;">
+        <div class="column" id="col-fb">
+            <div class="column-title fb-title">📘 FACEBOOK</div>
+        </div>
+        <div class="column" id="col-ig">
+            <div class="column-title ig-title">📸 INSTAGRAM</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    Chart.register(ChartDataLabels);
+
+    document.getElementById('excel-upload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        document.getElementById('file-name').textContent = "Cargando y procesando: " + file.name + "...";
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+            
+            procesarDatosYCrearGraficos(jsonData);
+            document.getElementById('file-name').textContent = "✅ " + file.name + " procesado con éxito.";
+            document.getElementById('dashboard-layout').style.display = "flex"; 
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    // Función inteligente para buscar filas sin importar dónde estén ubicadas
+    function encontrarFila(data, textoBuscado, columna = 0) {
+        for(let i = 0; i < data.length; i++) {
+            if (data[i] && String(data[i][columna] || '').toLowerCase().includes(textoBuscado.toLowerCase())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    function calcularPorcentajesPorSemana(datasets) {
+        const numSemanas = datasets[0].data.length;
+        for (let s = 0; s < numSemanas; s++) {
+            let totalSemana = 0;
+            for (let d = 0; d < datasets.length; d++) {
+                totalSemana += (parseFloat(datasets[d].data[s]) || 0);
+            }
+            if (totalSemana > 0) {
+                let factor = (totalSemana > 0.95 && totalSemana <= 1.05) ? 100 : (100 / totalSemana);
+                for (let d = 0; d < datasets.length; d++) {
+                    let val = parseFloat(datasets[d].data[s]) || 0;
+                    datasets[d].data[s] = parseFloat((val * factor).toFixed(1)); 
+                }
+            }
+        }
+        return datasets;
+    }
+
+    function extraerFila(data, numFila, inicioCol, finCol) {
+        let result = [];
+        let fila = data[numFila];
+        if (!fila) return new Array(finCol - inicioCol).fill(0);
+        
+        for(let i = inicioCol; i < finCol; i++){
+            let valor = parseFloat(fila[i]);
+            result.push(isNaN(valor) ? 0 : valor);
+        }
+        return result;
+    }
+
+    function procesarDatosYCrearGraficos(data) {
+        const colFb = document.getElementById('col-fb');
+        const colIg = document.getElementById('col-ig');
+        
+        colFb.querySelectorAll('.chart-container').forEach(el => el.remove());
+        colIg.querySelectorAll('.chart-container').forEach(el => el.remove());
+
+        // --- BÚSQUEDA DINÁMICA DE FILAS CLAVE ---
+        const filaFb = encontrarFila(data, 'facebook', 0);
+        const filaContenidoFb = encontrarFila(data, 'visualizaciones por contenido', 0);
+        const filaOrigenFb = encontrarFila(data, 'encuentran', 0);
+        const filaPublicoFb = encontrarFila(data, 'no seguidores', 0);
+
+        const filaIg = encontrarFila(data, 'instagram', 8);
+        const filaContenidoIg = encontrarFila(data, 'visualizaciones por contenido', 8);
+
+        // Nombres de las semanas (extraídos de la misma fila donde dice Facebook/Instagram)
+        const idxSemanasFb = filaFb !== -1 ? filaFb : 1;
+        const idxSemanasIg = filaIg !== -1 ? filaIg : 1;
+        
+        const semanasFb = data[idxSemanasFb] ? data[idxSemanasFb].slice(1, 7).map(s => s ? String(s).trim() : 'Semana') : ['S1','S2','S3','S4','S5','S6'];
+        const semanasIg = data[idxSemanasIg] ? data[idxSemanasIg].slice(9, 15).map(s => s ? String(s).trim() : 'Semana') : ['S1','S2','S3','S4','S5','S6'];
+
+        // ==================== FACEBOOK ====================
+
+        let baseFbIdx = filaFb !== -1 ? filaFb : 1;
+        crearGrafico(colFb, 'Visión General (Métricas Base)', {
+            labels: semanasFb,
+            datasets: [
+                { label: 'Visualizaciones', data: extraerFila(data, baseFbIdx + 1, 1, 7), backgroundColor: '#8B75D7' },
+                { label: 'Espectadores', data: extraerFila(data, baseFbIdx + 2, 1, 7), backgroundColor: '#E07A5F' },
+                { label: 'Interacción', data: extraerFila(data, baseFbIdx + 3, 1, 7), backgroundColor: '#3D5A80' },
+                { label: 'Visitas al perfil', data: extraerFila(data, baseFbIdx + 4, 1, 7), backgroundColor: '#F4A261' }
+            ]
+        }, false);
+
+        let contFbIdx = filaContenidoFb !== -1 ? filaContenidoFb : 7;
+        let fbContenidoDatasets = [
+            { label: 'Fotos', data: extraerFila(data, contFbIdx + 1, 1, 7), backgroundColor: '#6A4C93' },
+            { label: 'Carruseles', data: extraerFila(data, contFbIdx + 2, 1, 7), backgroundColor: '#1982C4' },
+            { label: 'Videos', data: extraerFila(data, contFbIdx + 3, 1, 7), backgroundColor: '#8AC926' },
+            { label: 'Enlace', data: extraerFila(data, contFbIdx + 4, 1, 7), backgroundColor: '#FFCA3A' }
+        ];
+        crearGrafico(colFb, 'Por Tipo de Contenido (%)', { labels: semanasFb, datasets: calcularPorcentajesPorSemana(fbContenidoDatasets) }, true);
+
+        let origFbIdx = filaOrigenFb !== -1 ? filaOrigenFb : 13;
+        let fbOrigenDatasets = [
+            { label: 'Reels', data: extraerFila(data, origFbIdx + 1, 1, 7), backgroundColor: '#FF595E' },
+            { label: 'Tu página', data: extraerFila(data, origFbIdx + 2, 1, 7), backgroundColor: '#FFCA3A' },
+            { label: 'Feed', data: extraerFila(data, origFbIdx + 3, 1, 7), backgroundColor: '#8AC926' },
+            { label: 'No disponible', data: extraerFila(data, origFbIdx + 4, 1, 7), backgroundColor: '#1982C4' }
+        ];
+        crearGrafico(colFb, 'Cómo encuentran tu contenido (%)', { labels: semanasFb, datasets: calcularPorcentajesPorSemana(fbOrigenDatasets) }, true);
+
+        let pubFbIdx = filaPublicoFb !== -1 ? filaPublicoFb : 19;
+        let fbPublicosDatasets = [
+            { label: 'No seguidores', data: extraerFila(data, pubFbIdx, 1, 7), backgroundColor: '#6A4C93' },
+            { label: 'Seguidores', data: extraerFila(data, pubFbIdx + 1, 1, 7), backgroundColor: '#F4A261' }
+        ];
+        crearGrafico(colFb, 'Público Alcanzado (%)', { labels: semanasFb, datasets: calcularPorcentajesPorSemana(fbPublicosDatasets) }, true);
+
+        // ==================== INSTAGRAM ====================
+
+        let baseIgIdx = filaIg !== -1 ? filaIg : 1;
+        crearGrafico(colIg, 'Visión General (Métricas Base)', {
+            labels: semanasIg,
+            datasets: [
+                { label: 'Visualizaciones', data: extraerFila(data, baseIgIdx + 1, 9, 15), backgroundColor: '#8B75D7' },
+                { label: 'Alcance', data: extraerFila(data, baseIgIdx + 2, 9, 15), backgroundColor: '#E07A5F' },
+                { label: 'Interacción', data: extraerFila(data, baseIgIdx + 3, 9, 15), backgroundColor: '#3D5A80' },
+                { label: 'Visitas al perfil', data: extraerFila(data, baseIgIdx + 4, 9, 15), backgroundColor: '#F4A261' }
+            ]
+        }, false);
+
+        let contIgIdx = filaContenidoIg !== -1 ? filaContenidoIg : 7;
+        let igContenidoDatasets = [
+            { label: 'Publicaciones', data: extraerFila(data, contIgIdx + 1, 9, 15), backgroundColor: '#6A4C93' },
+            { label: 'Reels', data: extraerFila(data, contIgIdx + 2, 9, 15), backgroundColor: '#FF595E' },
+            { label: 'Historias', data: extraerFila(data, contIgIdx + 3, 9, 15), backgroundColor: '#FFCA3A' }
+        ];
+        crearGrafico(colIg, 'Por Tipo de Contenido (%)', { labels: semanasIg, datasets: calcularPorcentajesPorSemana(igContenidoDatasets) }, true);
+    }
+
+    function crearGrafico(container, titulo, chartData, esPorcentual) {
+        const div = document.createElement('div');
+        div.className = 'chart-container';
+        const canvas = document.createElement('canvas');
+        div.appendChild(canvas);
+        container.appendChild(div);
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: titulo, font: { size: 16 } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed.y !== null) { 
+                                    label += esPorcentual ? context.parsed.y + '%' : context.parsed.y.toLocaleString('es-MX'); 
+                                }
+                                return label;
+                            }
+                        }
+                    },
+                    datalabels: {
+                        display: function(context) {
+                            let val = context.dataset.data[context.dataIndex];
+                            if (esPorcentual) return val > 5; 
+                            
+                            // Lógica para que en las gráficas base no se encimen los números chiquitos (ej. 9 visitas)
+                            let sum = context.chart.data.datasets.reduce((acc, curr) => acc + (Number(curr.data[context.dataIndex]) || 0), 0);
+                            return (val / sum) > 0.05; 
+                        },
+                        color: 'white',
+                        font: { weight: 'bold', size: 12 },
+                        formatter: function(value) {
+                            return esPorcentual ? value + '%' : Number(value).toLocaleString('es-MX');
+                        }
+                    }
+                },
+                scales: {
+                    x: { stacked: true },
+                    y: { 
+                        stacked: true, 
+                        max: esPorcentual ? 100 : undefined,
+                        grid: {
+                            drawBorder: false // Limpia el borde izquierdo
+                        },
+                        ticks: {
+                            // AQUÍ OCULTAMOS LOS TOTALES DEL EJE Y (solo los muestra si es gráfica porcentual)
+                            display: esPorcentual, 
+                            callback: function(value) { return value + (esPorcentual ? '%' : ''); }
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>

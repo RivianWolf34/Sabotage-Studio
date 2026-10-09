@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Reportes</title>
+    <!-- Librerías de SheetJS y Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Plugin para mostrar los porcentajes en texto dentro de la barra -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 1200px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+        .upload-section { text-align: center; margin-bottom: 30px; padding: 40px 20px; border: 2px dashed #bbb; border-radius: 10px; background-color: #fafafa; }
+        input[type="file"] { display: none; }
+        .custom-file-upload { display: inline-block; padding: 12px 24px; cursor: pointer; background-color: #3D5A80; color: white; border-radius: 5px; font-weight: bold; transition: 0.3s; }
+        .custom-file-upload:hover { background-color: #2b405b; }
+        
+        /* Contenedor a dos columnas */
+        .dashboard-layout { display: flex; gap: 30px; margin-top: 20px; }
+        .column { flex: 1; display: flex; flex-direction: column; gap: 20px; }
+        .column-title { text-align: center; font-size: 1.5em; font-weight: bold; padding-bottom: 10px; border-bottom: 3px solid #eee; margin-bottom: 10px; }
+        
+        .chart-container { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        canvas { max-width: 100%; height: 350px !important; }
+        
+        .fb-title { color: #1877F2; border-bottom-color: #1877F2; }
+        .ig-title { color: #E1306C; border-bottom-color: #E1306C; }
+
+        @media (max-width: 900px) { .dashboard-layout { flex-direction: column; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📊 Dashboard de Redes Sociales</h1>
+    <p class="subtitle">Sube tu archivo de Excel para actualizar las gráficas automáticamente</p>
+    
+    <div class="upload-section">
+        <label for="excel-upload" class="custom-file-upload">
+            📁 Seleccionar Archivo Excel (.xlsx)
+        </label>
+        <input id="excel-upload" type="file" accept=".xlsx, .xls" />
+        <p id="file-name" style="margin-top: 15px; color: #444; font-weight: bold;"></p>
+    </div>
+
+    <!-- Contenedor a dos columnas -->
+    <div class="dashboard-layout" id="dashboard-layout" style="display: none;">
+        <!-- Columna Izquierda: FACEBOOK -->
+        <div class="column" id="col-fb">
+            <div class="column-title fb-title">📘 FACEBOOK</div>
+        </div>
+        
+        <!-- Columna Derecha: INSTAGRAM -->
+        <div class="column" id="col-ig">
+            <div class="column-title ig-title">📸 INSTAGRAM</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    Chart.register(ChartDataLabels); // Activar etiquetas de texto en las barras
+
+    document.getElementById('excel-upload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        document.getElementById('file-name').textContent = "Cargando y procesando: " + file.name + "...";
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, {type: 'array'});
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+            
+            procesarDatosYCrearGraficos(jsonData);
+            document.getElementById('file-name').textContent = "✅ " + file.name + " procesado con éxito.";
+            document.getElementById('dashboard-layout').style.display = "flex"; // Mostrar dashboard
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    // 1. FUNCIÓN MÁGICA: Convierte números absolutos o fracciones en porcentajes cerrados a 100%
+    function calcularPorcentajesPorSemana(datasets) {
+        const numSemanas = datasets[0].data.length;
+        
+        for (let s = 0; s < numSemanas; s++) {
+            let totalSemana = 0;
+            // Primero, sumar el total real de la semana
+            for (let d = 0; d < datasets.length; d++) {
+                let val = parseFloat(datasets[d].data[s]) || 0;
+                totalSemana += val;
+            }
+            
+            if (totalSemana > 0) {
+                // Si la suma de Excel ya es muy cercana a 1 (ej. suma de porcentajes 0.10 + 0.90), factor = 100
+                // Si la suma es 3500 (números absolutos), factor = 100 / 3500
+                let factor = (totalSemana > 0.95 && totalSemana <= 1.05) ? 100 : (100 / totalSemana);
+                
+                for (let d = 0; d < datasets.length; d++) {
+                    let val = parseFloat(datasets[d].data[s]) || 0;
+                    datasets[d].data[s] = parseFloat((val * factor).toFixed(1)); // Redondear a 1 decimal
+                }
+            }
+        }
+        return datasets;
+    }
+
+    // 2. FUNCIÓN PARA SACAR UNA LÍNEA ENTERA DEL EXCEL FÁCILMENTE
+    function extraerFila(data, numFila, inicioCol, finCol) {
+        let result = [];
+        let fila = data[numFila];
+        if (!fila) return new Array(finCol - inicioCol).fill(0);
+        
+        for(let i = inicioCol; i < finCol; i++){
+            // Si la celda está vacía o es texto, forzar a 0, de lo contrario tomar el número
+            let valor = parseFloat(fila[i]);
+            result.push(isNaN(valor) ? 0 : valor);
+        }
+        return result;
+    }
+
+    function procesarDatosYCrearGraficos(data) {
+        const colFb = document.getElementById('col-fb');
+        const colIg = document.getElementById('col-ig');
+        
+        // Limpiamos gráficas de archivos anteriores
+        colFb.querySelectorAll('.chart-container').forEach(el => el.remove());
+        colIg.querySelectorAll('.chart-container').forEach(el => el.remove());
+
+        // Extraer etiquetas de las semanas (Fila 2 en Excel -> Índice 1 en JS)
+        // FB (Col B a G -> Índices 1 a 6) / IG (Col J a O -> Índices 9 a 14)
+        const semanasFb = extraerFila(data, 1, 1, 7).map(s => s ? String(s) : 'Semana'); 
+        const semanasIg = extraerFila(data, 1, 9, 15).map(s => s ? String(s) : 'Semana'); 
+
+        // ==================== FACEBOOK ====================
+
+        // FB - Absoluto (Filas 3 a 6)
+        crearGrafico(colFb, 'Visión General (Métricas Base)', {
+            labels: semanasFb,
+            datasets: [
+                { label: 'Visualizaciones', data: extraerFila(data, 2, 1, 7), backgroundColor: '#8B75D7' },
+                { label: 'Espectadores', data: extraerFila(data, 3, 1, 7), backgroundColor: '#E07A5F' },
+                { label: 'Interacción', data: extraerFila(data, 4, 1, 7), backgroundColor: '#3D5A80' },
+                { label: 'Visitas al perfil', data: extraerFila(data, 5, 1, 7), backgroundColor: '#F4A261' }
+            ]
+        }, false);
+
+        // FB - Por Tipo de Contenido (Filas 9 a 12) -> PORCENTUAL
+        let fbContenidoDatasets = [
+            { label: 'Fotos', data: extraerFila(data, 8, 1, 7), backgroundColor: '#6A4C93' },
+            { label: 'Carruseles', data: extraerFila(data, 9, 1, 7), backgroundColor: '#1982C4' },
+            { label: 'Videos', data: extraerFila(data, 10, 1, 7), backgroundColor: '#8AC926' },
+            { label: 'Enlace', data: extraerFila(data, 11, 1, 7), backgroundColor: '#FFCA3A' }
+        ];
+        crearGrafico(colFb, 'Por Tipo de Contenido (%)', { labels: semanasFb, datasets: calcularPorcentajesPorSemana(fbContenidoDatasets) }, true);
+
+        // FB - Orígenes de Tráfico (Filas 15 a 18) -> PORCENTUAL
+        let fbOrigenDatasets = [
+            { label: 'Reels', data: extraerFila(data, 14, 1, 7), backgroundColor: '#FF595E' },
+            { label: 'Tu página', data: extraerFila(data, 15, 1, 7), backgroundColor: '#FFCA3A' },
+            { label: 'Feed', data: extraerFila(data, 16, 1, 7), backgroundColor: '#8AC926' },
+            { label: 'No disponible', data: extraerFila(data, 17, 1, 7), backgroundColor: '#1982C4' }
+        ];
+        crearGrafico(colFb, 'Cómo encuentran tu contenido (%)', { labels: semanasFb, datasets: calcularPorcentajesPorSemana(fbOrigenDatasets) }, true);
+
+        // FB - Públicos (Filas 20 y 21) -> PORCENTUAL
+        let fbPublicosDatasets = [
+            { label: 'No seguidores', data: extraerFila(data, 19, 1, 7), backgroundColor: '#6A4C93' },
+            { label: 'Seguidores', data: extraerFila(data, 20, 1, 7), backgroundColor: '#F4A261' }
+        ];
+        crearGrafico(colFb, 'Público Alcanzado (%)', { labels: semanasFb, datasets: calcularPorcentajesPorSemana(fbPublicosDatasets) }, true);
+
+        // ==================== INSTAGRAM ====================
+
+        // IG - Absoluto (Filas 3 a 6)
+        crearGrafico(colIg, 'Visión General (Métricas Base)', {
+            labels: semanasIg,
+            datasets: [
+                { label: 'Visualizaciones', data: extraerFila(data, 2, 9, 15), backgroundColor: '#8B75D7' },
+                { label: 'Alcance', data: extraerFila(data, 3, 9, 15), backgroundColor: '#E07A5F' },
+                { label: 'Interacción', data: extraerFila(data, 4, 9, 15), backgroundColor: '#3D5A80' },
+                { label: 'Visitas al perfil', data: extraerFila(data, 5, 9, 15), backgroundColor: '#F4A261' }
+            ]
+        }, false);
+
+        // IG - Por Tipo de Contenido (Filas 9 a 11, col J a O en Excel) -> PORCENTUAL
+        let igContenidoDatasets = [
+            { label: 'Publicaciones', data: extraerFila(data, 8, 9, 15), backgroundColor: '#6A4C93' },
+            { label: 'Reels', data: extraerFila(data, 9, 9, 15), backgroundColor: '#FF595E' },
+            { label: 'Historias', data: extraerFila(data, 10, 9, 15), backgroundColor: '#FFCA3A' }
+        ];
+        crearGrafico(colIg, 'Por Tipo de Contenido (%)', { labels: semanasIg, datasets: calcularPorcentajesPorSemana(igContenidoDatasets) }, true);
+    }
+
+    // 3. CONSTRUCTOR DEL GRÁFICO FINAL
+    function crearGrafico(container, titulo, chartData, esPorcentual) {
+        const div = document.createElement('div');
+        div.className = 'chart-container';
+        const canvas = document.createElement('canvas');
+        div.appendChild(canvas);
+        container.appendChild(div);
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: titulo, font: { size: 16 } },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed.y !== null) { 
+                                    label += context.parsed.y + (esPorcentual ? '%' : ''); 
+                                }
+                                return label;
+                            }
+                        }
+                    },
+                    datalabels: {
+                        // Solo mostramos el numerito adentro de la barra si es porcentual y la porción es mayor a 5% 
+                        // (para que no se encimen los textos si el cuadrito es muy chico)
+                        display: function(context) {
+                            return esPorcentual && context.dataset.data[context.dataIndex] > 5;
+                        },
+                        color: 'white',
+                        font: { weight: 'bold' },
+                        formatter: function(value) {
+                            return value + '%';
+                        }
+                    }
+                },
+                scales: {
+                    x: { stacked: true },
+                    y: { 
+                        stacked: true, 
+                        max: esPorcentual ? 100 : undefined, // Fijar la escala tope a 100 si es gráfica de porcentaje
+                        ticks: {
+                            callback: function(value) { return value + (esPorcentual ? '%' : ''); }
+                        }
+                    }
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>

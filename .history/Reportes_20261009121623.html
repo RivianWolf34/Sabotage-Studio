@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard de Reportes</title>
+    <!-- Librería para leer archivos de Excel -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- Librería para generar las gráficas -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; }
+        .container { max-width: 1000px; margin: auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; margin-bottom: 5px; }
+        p.subtitle { text-align: center; color: #666; margin-bottom: 30px; }
+        .upload-section { text-align: center; margin-bottom: 30px; padding: 40px 20px; border: 2px dashed #bbb; border-radius: 10px; background-color: #fafafa; }
+        input[type="file"] { display: none; }
+        .custom-file-upload { display: inline-block; padding: 12px 24px; cursor: pointer; background-color: #3D5A80; color: white; border-radius: 5px; font-weight: bold; transition: 0.3s; }
+        .custom-file-upload:hover { background-color: #2b405b; }
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .chart-container { background: #fff; border: 1px solid #eee; padding: 15px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+        canvas { max-width: 100%; height: 350px !important; }
+        @media (max-width: 768px) { .charts-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📊 Dashboard Interactivo de Redes</h1>
+    <p class="subtitle">Sube tu archivo de Excel para generar los gráficos automáticos</p>
+    
+    <div class="upload-section">
+        <label for="excel-upload" class="custom-file-upload">
+            📁 Seleccionar Archivo Excel (.xlsx)
+        </label>
+        <input id="excel-upload" type="file" accept=".xlsx, .xls" />
+        <p id="file-name" style="margin-top: 15px; color: #444; font-weight: bold;"></p>
+    </div>
+
+    <!-- Contenedor donde se inyectarán las gráficas -->
+    <div class="charts-grid" id="charts-container"></div>
+</div>
+
+<script>
+    // Escuchar cuando el usuario seleccione un archivo
+    document.getElementById('excel-upload').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        document.getElementById('file-name').textContent = "Cargando: " + file.name + "...";
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const data = new Uint8Array(e.target.result);
+            // Leer el archivo con SheetJS
+            const workbook = XLSX.read(data, {type: 'array'});
+            
+            // Tomar la primera hoja del Excel
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            
+            // Convertir la hoja a una matriz bidimensional (filas y columnas)
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+            
+            // Llamar a la función que procesa y dibuja
+            procesarDatosYCrearGraficos(jsonData);
+            document.getElementById('file-name').textContent = "✅ " + file.name + " procesado con éxito.";
+        };
+        reader.readAsArrayBuffer(file);
+    });
+
+    function procesarDatosYCrearGraficos(data) {
+        const container = document.getElementById('charts-container');
+        container.innerHTML = ''; // Limpiar gráficas anteriores
+
+        // Basado en tu estructura de "Reportes.xlsx":
+        // La fila 2 (índice 1 en código) contiene las semanas de FB de la columna B a G (índices 1 al 6)
+        const semanasFb = data[1].slice(1, 7); 
+        
+        // --- 1. Gráfica: FACEBOOK MÉTRICAS PRINCIPALES ---
+        // Filas 3, 4, 5 y 6 corresponden a Visualizaciones, Espectadores, Interacción y Visitas
+        const fbData = {
+            labels: semanasFb,
+            datasets: [
+                { label: data[2][0] || 'Visualizaciones', data: data[2].slice(1, 7), backgroundColor: '#8B75D7' }, // Morado
+                { label: data[3][0] || 'Espectadores', data: data[3].slice(1, 7), backgroundColor: '#E07A5F' },   // Coral
+                { label: data[4][0] || 'Interacción', data: data[4].slice(1, 7), backgroundColor: '#3D5A80' },    // Azul/Verde oscuro
+                { label: data[5][0] || 'Visitas al perfil', data: data[5].slice(1, 7), backgroundColor: '#F4A261'}// Amarillo
+            ]
+        };
+        crearGrafico(container, 'Facebook - Métricas Generales', fbData);
+
+        // --- 2. Gráfica: INSTAGRAM MÉTRICAS PRINCIPALES ---
+        // En tu Excel, Instagram empieza más adelante en las columnas J a O (índices 9 al 14)
+        const semanasIg = data[1].slice(9, 15);
+        const igData = {
+            labels: semanasIg,
+            datasets: [
+                { label: data[2][8] || 'Visualizaciones', data: data[2].slice(9, 15), backgroundColor: '#8B75D7' },
+                { label: data[3][8] || 'Alcance', data: data[3].slice(9, 15), backgroundColor: '#E07A5F' },
+                { label: data[4][8] || 'Interacción', data: data[4].slice(9, 15), backgroundColor: '#3D5A80' },
+                { label: data[5][8] || 'Visitas al perfil', data: data[5].slice(9, 15), backgroundColor: '#F4A261'}
+            ]
+        };
+        crearGrafico(container, 'Instagram - Métricas Generales', igData);
+
+        // --- 3. Gráfica: FACEBOOK POR TIPO DE CONTENIDO ---
+        // Filas 9, 10 y 11 (índices 8, 9, 10 en código)
+        const contenidoFbData = {
+            labels: semanasFb,
+            datasets: [
+                { label: data[8][0] || 'Fotos', data: data[8].slice(1, 7), backgroundColor: '#6A4C93' },
+                { label: data[9][0] || 'Carruseles', data: data[9].slice(1, 7), backgroundColor: '#1982C4' },
+                { label: data[10][0] || 'Videos', data: data[10].slice(1, 7), backgroundColor: '#8AC926' }
+            ]
+        };
+        crearGrafico(container, 'Facebook - Visualizaciones por Contenido', contenidoFbData);
+        
+        // --- 4. Gráfica: ORIGEN DE TRÁFICO (CÓMO ENCUENTRAN TU CONTENIDO) ---
+        // Filas 15, 16, 17 y 18 (índices 14, 15, 16, 17)
+        const origenData = {
+            labels: semanasFb,
+            datasets: [
+                { label: data[14][0] || 'Reels', data: data[14].slice(1, 7), backgroundColor: '#FF595E' },
+                { label: data[15][0] || 'Tu Página', data: data[15].slice(1, 7), backgroundColor: '#FFCA3A' },
+                { label: data[16][0] || 'Feed', data: data[16].slice(1, 7), backgroundColor: '#8AC926' },
+                { label: data[17][0] || 'No Disponible', data: data[17].slice(1, 7), backgroundColor: '#1982C4' }
+            ]
+        };
+        crearGrafico(container, 'Orígenes de Tráfico', origenData);
+    }
+
+    // Función constructora para generar gráficos apilados
+    function crearGrafico(container, titulo, chartData) {
+        const div = document.createElement('div');
+        div.className = 'chart-container';
+        const canvas = document.createElement('canvas');
+        div.appendChild(canvas);
+        container.appendChild(div);
+
+        new Chart(canvas, {
+            type: 'bar',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: { display: true, text: titulo, font: { size: 16 } },
+                    tooltip: {
+                        callbacks: {
+                            // Muestra el valor en el globo de información al pasar el mouse
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.parsed.y !== null) { label += context.parsed.y; }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { stacked: true },
+                    y: { stacked: true, beginAtZero: true }
+                }
+            }
+        });
+    }
+</script>
+</body>
+</html>
